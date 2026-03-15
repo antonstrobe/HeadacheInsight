@@ -156,56 +156,58 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        HeadacheInsightSectionCard(
-            title = stringResource(R.string.home_actions_title),
-            supportingText = stringResource(R.string.home_actions_subtitle),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                state.pendingEpisode?.let { pending ->
-                    Button(
-                        onClick = { onContinueEpisode(pending.id) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.home_continue_episode),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            state.pendingEpisode?.let { pending ->
+                Button(
+                    onClick = { onContinueEpisode(pending.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_continue_episode),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 }
-
-                bottomActions.chunked(2).forEach { rowActions ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        rowActions.forEach { action ->
-                            HomeActionButton(
-                                label = action.label,
-                                onClick = action.onClick,
-                                enabled = action.enabled,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (rowActions.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                HeadacheInsightPrimaryPainButton(
-                    label = stringResource(R.string.home_pain_button),
-                    icon = Icons.Outlined.MedicalServices,
-                    onClick = onStartEpisode,
-                )
             }
+
+            HeadacheInsightSectionCard(
+                title = stringResource(R.string.home_actions_title),
+                supportingText = stringResource(R.string.home_actions_subtitle),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 270.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    bottomActions.chunked(2).forEach { rowActions ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            rowActions.forEach { action ->
+                                HomeActionButton(
+                                    label = action.label,
+                                    onClick = action.onClick,
+                                    enabled = action.enabled,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (rowActions.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            HeadacheInsightPrimaryPainButton(
+                label = stringResource(R.string.home_pain_button),
+                icon = Icons.Outlined.MedicalServices,
+                onClick = onStartEpisode,
+            )
         }
     }
 }
