@@ -1,18 +1,26 @@
 package com.neuron.headacheinsight.feature.home
 
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,17 +90,39 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onSync: () -> Unit,
 ) {
+    val bottomActions = buildList {
+        add(HomeActionItem(label = stringResource(R.string.home_history), onClick = onHistory))
+        add(HomeActionItem(label = stringResource(R.string.home_profile), onClick = onProfile))
+        add(HomeActionItem(label = stringResource(R.string.home_attachments), onClick = onAttachments))
+        add(HomeActionItem(label = stringResource(R.string.home_reports), onClick = onReports))
+        add(
+            HomeActionItem(
+                label = stringResource(R.string.home_new_questions),
+                onClick = onQuestions,
+                enabled = state.cloudEnabled,
+            ),
+        )
+        add(HomeActionItem(label = stringResource(R.string.home_settings), onClick = onSettings))
+        add(HomeActionItem(label = stringResource(R.string.home_sync_queue), onClick = onSync))
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        HeadacheInsightPrimaryPainButton(
-            label = stringResource(R.string.home_pain_button),
-            icon = Icons.Outlined.MedicalServices,
-            onClick = onStartEpisode,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = stringResource(R.string.home_info_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                text = stringResource(R.string.home_info_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
 
         HeadacheInsightSectionCard(
             title = stringResource(R.string.home_status_title),
@@ -118,36 +148,90 @@ fun HomeScreen(
                     HeadacheInsightStatusColors.Queued
                 },
             )
-            Text(stringResource(R.string.home_monthly_headache_days, state.monthlyHeadacheDays))
+            Text(
+                text = stringResource(R.string.home_monthly_headache_days, state.monthlyHeadacheDays),
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
 
-        state.pendingEpisode?.let { pending ->
-            Button(
-                onClick = { onContinueEpisode(pending.id) },
-                modifier = Modifier.fillMaxWidth(),
+        Spacer(modifier = Modifier.weight(1f))
+
+        HeadacheInsightSectionCard(
+            title = stringResource(R.string.home_actions_title),
+            supportingText = stringResource(R.string.home_actions_subtitle),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.home_continue_episode))
-            }
-        }
+                state.pendingEpisode?.let { pending ->
+                    Button(
+                        onClick = { onContinueEpisode(pending.id) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_continue_episode),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            HomeActionButton(stringResource(R.string.home_history), onHistory)
-            HomeActionButton(stringResource(R.string.home_profile), onProfile)
-            HomeActionButton(stringResource(R.string.home_attachments), onAttachments)
-            HomeActionButton(stringResource(R.string.home_reports), onReports)
-            HomeActionButton(stringResource(R.string.home_new_questions), onQuestions)
-            HomeActionButton(stringResource(R.string.home_settings), onSettings)
-            HomeActionButton(stringResource(R.string.home_sync_queue), onSync)
+                bottomActions.chunked(2).forEach { rowActions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        rowActions.forEach { action ->
+                            HomeActionButton(
+                                label = action.label,
+                                onClick = action.onClick,
+                                enabled = action.enabled,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowActions.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                HeadacheInsightPrimaryPainButton(
+                    label = stringResource(R.string.home_pain_button),
+                    icon = Icons.Outlined.MedicalServices,
+                    onClick = onStartEpisode,
+                )
+            }
         }
     }
 }
+
+private data class HomeActionItem(
+    val label: String,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+)
 
 @Composable
 private fun HomeActionButton(
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Text(label)
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(64.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+        )
     }
 }

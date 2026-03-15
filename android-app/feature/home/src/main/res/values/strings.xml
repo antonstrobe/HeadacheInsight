@@ -1,7 +1,11 @@
 <resources>
+    <string name="home_info_title">Ready for fast capture</string>
+    <string name="home_info_subtitle">Status stays at the top. Main actions stay near the bottom for easier one-handed use during pain.</string>
     <string name="home_pain_button">My head hurts</string>
     <string name="home_status_title">Status</string>
     <string name="home_status_subtitle">Offline-first core with optional cloud analysis</string>
+    <string name="home_actions_title">Main actions</string>
+    <string name="home_actions_subtitle">The most important controls stay close to your thumb.</string>
     <string name="home_cloud_enabled">Cloud enabled</string>
     <string name="home_local_only">Local only</string>
     <string name="home_queue_count">Queue %1$d</string>

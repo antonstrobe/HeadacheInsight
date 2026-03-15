@@ -7,8 +7,16 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+$CanonicalSourcePng = Join-Path $RepoRoot "img\app-icon-master.png"
+$FallbackSourcePng = Join-Path $RepoRoot "img\icon.png"
 if ([string]::IsNullOrWhiteSpace($SourcePng)) {
-    $SourcePng = Join-Path $RepoRoot "img\app-icon-master.png"
+    if (Test-Path $CanonicalSourcePng) {
+        $SourcePng = $CanonicalSourcePng
+    } elseif (Test-Path $FallbackSourcePng) {
+        $SourcePng = $FallbackSourcePng
+    } else {
+        $SourcePng = $CanonicalSourcePng
+    }
 }
 
 $ResRoot = Join-Path $RepoRoot "android-app\app\src\main\res"
@@ -110,6 +118,11 @@ function Update-AdaptiveIconXml([string]$Directory) {
 Write-Section "Проверка исходника"
 if (-not (Test-Path $SourcePng)) {
     throw "Не найден исходный PNG: $SourcePng"
+}
+
+$resolvedSourcePath = (Resolve-Path $SourcePng).Path
+if ($resolvedSourcePath -ne $CanonicalSourcePng) {
+    Copy-Item -Path $resolvedSourcePath -Destination $CanonicalSourcePng -Force
 }
 
 Add-Type -AssemblyName System.Drawing

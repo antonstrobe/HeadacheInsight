@@ -79,3 +79,7 @@ Create a 1024x1024 transparent PNG app icon master for a calm premium migraine-t
 Сохраните итоговый файл как:
 
 - `img/app-icon-master.png`
+
+Если вам удобнее, можно временно положить его и как:
+
+- `img/icon.png`
