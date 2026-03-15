@@ -1,10 +1,14 @@
 # HeadacheInsight
 
-![HeadacheInsight banner](docs/assets/headacheinsight-banner.svg)
-
 [![Open GitHub repository](docs/assets/github-project-card.png)](https://github.com/AntonStrobe/HeadacheInsight)
 
-HeadacheInsight is a privacy-first, offline-first Android application for fast headache and migraine episode logging with optional cloud analysis through a secure backend proxy.
+## Описание
+
+HeadacheInsight — privacy-first и offline-first Android-приложение для быстрой фиксации головной боли и мигрени. Приложение помогает быстро сохранить эпизод, работать голосом во время приступа, хранить данные локально и при желании подключать структурированный облачный анализ через безопасный backend proxy.
+
+## Description
+
+HeadacheInsight is a privacy-first, offline-first Android application for fast headache and migraine tracking. It is designed for low-friction episode capture, voice-first input during pain, local-first storage, and optional structured cloud analysis through a secure backend proxy.
 
 ## What It Does
 
