@@ -2,7 +2,7 @@
 
 ![HeadacheInsight banner](docs/assets/headacheinsight-banner.svg)
 
-[![Open GitHub repository](docs/assets/github-project-card.svg)](https://github.com/AntonStrobe/HeadacheInsight)
+[![Open GitHub repository](docs/assets/github-project-card.png)](https://github.com/AntonStrobe/HeadacheInsight)
 
 HeadacheInsight is a privacy-first, offline-first Android application for fast headache and migraine episode logging with optional cloud analysis through a secure backend proxy.
 
