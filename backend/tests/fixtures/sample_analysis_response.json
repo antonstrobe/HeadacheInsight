@@ -1,0 +1,33 @@
+{
+  "schema_version": "v1",
+  "analysis_id": "analysis-sample-1",
+  "owner_type": "EPISODE",
+  "owner_id": "episode-123",
+  "generated_at": "2026-03-15T10:05:00Z",
+  "urgent_action": {
+    "level": "MONITOR",
+    "reasons": ["No red flags reported in sample fixture."],
+    "user_message": "Monitor symptoms and continue logging."
+  },
+  "user_summary": {
+    "plain_language_summary": "This sample suggests a migraine-like pattern worth tracking.",
+    "key_observations": ["unilateral pain", "light sensitivity"]
+  },
+  "clinician_summary": {
+    "concise_medical_context": "Sample unilateral throbbing headache with sensory sensitivity.",
+    "headache_day_estimate": "unknown",
+    "acute_medication_use_estimate": "unknown",
+    "functional_impact_summary": "moderate"
+  },
+  "hypotheses": [],
+  "suspected_patterns": [],
+  "next_questions": [],
+  "suggested_tracking_fields": ["sleep", "hydration", "screen exposure"],
+  "suggested_attachments": [],
+  "suggested_doctor_discussion_points": ["Discuss recurrence and trigger patterns."],
+  "suggested_specialists": [],
+  "suggested_tests_or_evaluations": [],
+  "self_care_general": ["Rest in a quiet room if needed."],
+  "disclaimer": "This is not a diagnosis and does not replace medical care.",
+  "needs_human_clinician_review": true
+}

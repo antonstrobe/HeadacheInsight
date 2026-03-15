@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_cloud_title">Облачный анализ</string>
+    <string name="settings_backend_title">URL сервера</string>
+    <string name="settings_backend_label">URL сервера</string>
+    <string name="settings_language_title">Язык</string>
+    <string name="settings_language_subtitle">Используйте один из двух стартовых языков. Следующим будет китайский.</string>
+    <string name="settings_language_russian">Русский</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_selected">Выбрано: %1$s</string>
+    <string name="settings_save">Сохранить настройки</string>
+</resources>

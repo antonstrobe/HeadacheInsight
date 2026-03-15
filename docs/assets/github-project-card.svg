@@ -1,0 +1,22 @@
+<svg width="860" height="160" viewBox="0 0 860 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cardbg" x1="34" y1="18" x2="812" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101720"/>
+      <stop offset="1" stop-color="#182433"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="80" y1="40" x2="160" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D14343"/>
+      <stop offset="1" stop-color="#F17C6B"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="852" height="152" rx="24" fill="url(#cardbg)"/>
+  <rect x="4" y="4" width="852" height="152" rx="24" stroke="#33475B" stroke-width="2"/>
+  <rect x="42" y="32" width="96" height="96" rx="24" fill="#0F161E"/>
+  <circle cx="90" cy="80" r="28" fill="url(#accent)"/>
+  <path d="M66 82C72.8 76.9 81.9 74 91.8 74C106.3 74 119.4 80.6 127.7 90.9L119 97.8C112.9 90.2 103.4 85.4 92.7 85.4C85.4 85.4 78.7 87.6 73.1 91.4L66 82Z" fill="#F8FBFD"/>
+  <text x="170" y="63" fill="#9DB2C3" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="600">GitHub repository</text>
+  <text x="170" y="97" fill="#F5F8FA" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">AntonStrobe / HeadacheInsight</text>
+  <text x="170" y="124" fill="#79C7C5" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Open the project, sources, release assets and setup guide</text>
+  <path d="M756 80L792 80" stroke="#F5F8FA" stroke-width="6" stroke-linecap="round"/>
+  <path d="M777 62L795 80L777 98" stroke="#F5F8FA" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

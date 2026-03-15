@@ -1,0 +1,7 @@
+<resources>
+    <string name="profile_title">Профиль</string>
+    <string name="profile_display_name">Имя</string>
+    <string name="profile_city_region">Город / регион</string>
+    <string name="profile_cloud_title">Облачный анализ</string>
+    <string name="profile_save">Сохранить профиль</string>
+</resources>

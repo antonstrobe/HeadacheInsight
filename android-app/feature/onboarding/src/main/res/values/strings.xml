@@ -1,0 +1,15 @@
+<resources>
+    <string name="onboarding_privacy_title">Privacy and safety</string>
+    <string name="onboarding_privacy_subtitle">HeadacheInsight is not a medical device and does not diagnose. It works offline and cloud analysis is optional.</string>
+    <string name="onboarding_privacy_body">Use this app to collect structured information for yourself and for clinician conversations.</string>
+    <string name="onboarding_profile_title">Basic profile</string>
+    <string name="onboarding_name_label">Name or nickname</string>
+    <string name="onboarding_city_label">City / region (coarse)</string>
+    <string name="onboarding_cloud_title">Enable cloud analysis</string>
+    <string name="onboarding_cloud_subtitle">Optional structured analysis through your backend. The app is still useful without it.</string>
+    <string name="onboarding_location_title">Allow coarse location</string>
+    <string name="onboarding_location_subtitle">Store only city or region snapshots when they matter.</string>
+    <string name="onboarding_attachment_title">Allow attachment uploads</string>
+    <string name="onboarding_attachment_subtitle">Needed only if you want cloud processing for files and images.</string>
+    <string name="onboarding_continue">Continue</string>
+</resources>

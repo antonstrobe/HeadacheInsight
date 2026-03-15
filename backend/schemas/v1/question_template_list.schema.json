@@ -1,0 +1,59 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "questions"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "schemaVersion",
+          "source",
+          "category",
+          "stage",
+          "prompt",
+          "shortLabel",
+          "helpText",
+          "answerType",
+          "options",
+          "priority",
+          "required",
+          "skippable",
+          "voiceAllowed",
+          "visibleIf",
+          "exportToClinician",
+          "redFlagWeight",
+          "aiEligible",
+          "createdAt",
+          "active"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "schemaVersion": { "type": "string" },
+          "source": { "type": "string", "enum": ["SEED", "API", "LOCAL_RULE", "MANUAL"] },
+          "category": { "type": "string" },
+          "stage": { "type": "string", "enum": ["ACUTE_FAST", "ACUTE_DETAIL", "PROFILE", "DOCTOR", "ATTACHMENTS", "REVIEW"] },
+          "prompt": { "type": "string" },
+          "shortLabel": { "type": "string" },
+          "helpText": { "type": ["string", "null"] },
+          "answerType": { "type": "string", "enum": ["BOOLEAN", "SCALE", "SINGLE_SELECT", "MULTI_SELECT", "FREE_TEXT", "NUMBER", "DATE_TIME", "DURATION", "ATTACHMENT_REQUEST", "VOICE_NOTE", "MEDICATION_LIST"] },
+          "options": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "integer" },
+          "required": { "type": "boolean" },
+          "skippable": { "type": "boolean" },
+          "voiceAllowed": { "type": "boolean" },
+          "visibleIf": { "type": ["string", "null"] },
+          "exportToClinician": { "type": "boolean" },
+          "redFlagWeight": { "type": "integer" },
+          "aiEligible": { "type": "boolean" },
+          "createdAt": { "type": "string" },
+          "active": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

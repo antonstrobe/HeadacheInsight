@@ -1,0 +1,18 @@
+<resources>
+    <string name="episode_loading">Loading episode…</string>
+    <string name="episode_title">Episode</string>
+    <string name="episode_subtitle">Timeline, transcript, answers, attachments, and safety markers</string>
+    <string name="episode_started">Started</string>
+    <string name="episode_severity">Severity</string>
+    <string name="episode_red_flags">Red flags</string>
+    <string name="episode_symptoms_title">Symptoms</string>
+    <string name="episode_transcripts_title">Transcripts</string>
+    <string name="episode_attachments_title">Attachments</string>
+    <string name="episode_answers_title">Follow-up answers</string>
+    <string name="episode_analysis_title">Analysis snapshots</string>
+    <string name="episode_symptom_line">%1$s • %2$s</string>
+    <string name="episode_transcript_line">%1$s: %2$s</string>
+    <string name="episode_attachment_line">%1$s • %2$s</string>
+    <string name="episode_answer_line">%1$s: %2$s</string>
+    <string name="episode_analysis_line">%1$s • %2$s</string>
+</resources>

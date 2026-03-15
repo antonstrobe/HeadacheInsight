@@ -1,0 +1,7 @@
+<resources>
+    <string name="profile_title">Profile</string>
+    <string name="profile_display_name">Display name</string>
+    <string name="profile_city_region">City / region</string>
+    <string name="profile_cloud_title">Cloud analysis</string>
+    <string name="profile_save">Save profile</string>
+</resources>

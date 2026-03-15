@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["owner_id", "summary"],
+  "properties": {
+    "owner_id": { "type": "string" },
+    "summary": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+<resources>
+    <string name="questionnaire_answer_label">Answer</string>
+    <string name="questionnaire_save">Save</string>
+</resources>

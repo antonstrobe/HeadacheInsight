@@ -1,0 +1,151 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "owner_type",
+    "owner_id",
+    "generated_at",
+    "urgent_action",
+    "user_summary",
+    "clinician_summary",
+    "hypotheses",
+    "suspected_patterns",
+    "next_questions",
+    "suggested_tracking_fields",
+    "suggested_attachments",
+    "suggested_doctor_discussion_points",
+    "suggested_specialists",
+    "suggested_tests_or_evaluations",
+    "self_care_general",
+    "disclaimer",
+    "needs_human_clinician_review"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "analysis_id": { "type": "string" },
+    "owner_type": { "type": "string", "enum": ["EPISODE", "PROFILE"] },
+    "owner_id": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "urgent_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "reasons", "user_message"],
+      "properties": {
+        "level": { "type": "string", "enum": ["NONE", "MONITOR", "DISCUSS_SOON", "URGENT", "EMERGENCY"] },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "user_message": { "type": "string" }
+      }
+    },
+    "user_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plain_language_summary", "key_observations"],
+      "properties": {
+        "plain_language_summary": { "type": "string" },
+        "key_observations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "clinician_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concise_medical_context", "headache_day_estimate", "acute_medication_use_estimate", "functional_impact_summary"],
+      "properties": {
+        "concise_medical_context": { "type": "string" },
+        "headache_day_estimate": { "type": ["string", "null"] },
+        "acute_medication_use_estimate": { "type": ["string", "null"] },
+        "functional_impact_summary": { "type": ["string", "null"] }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "confidence", "rationale", "supporting_signals", "missing_information", "discussion_with_doctor"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+          "rationale": { "type": "string" },
+          "supporting_signals": { "type": "array", "items": { "type": "string" } },
+          "missing_information": { "type": "array", "items": { "type": "string" } },
+          "discussion_with_doctor": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "suspected_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "description", "evidence"],
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "next_questions": { "type": "array", "items": { "$ref": "#/$defs/questionTemplate" } },
+    "suggested_tracking_fields": { "type": "array", "items": { "type": "string" } },
+    "suggested_attachments": { "type": "array", "items": { "type": "string" } },
+    "suggested_doctor_discussion_points": { "type": "array", "items": { "type": "string" } },
+    "suggested_specialists": { "type": "array", "items": { "type": "string" } },
+    "suggested_tests_or_evaluations": { "type": "array", "items": { "type": "string" } },
+    "self_care_general": { "type": "array", "items": { "type": "string" } },
+    "disclaimer": { "type": "string" },
+    "needs_human_clinician_review": { "type": "boolean" }
+  },
+  "$defs": {
+    "questionTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "schemaVersion",
+        "source",
+        "category",
+        "stage",
+        "prompt",
+        "shortLabel",
+        "helpText",
+        "answerType",
+        "options",
+        "priority",
+        "required",
+        "skippable",
+        "voiceAllowed",
+        "visibleIf",
+        "exportToClinician",
+        "redFlagWeight",
+        "aiEligible",
+        "createdAt",
+        "active"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "schemaVersion": { "type": "string" },
+        "source": { "type": "string", "enum": ["SEED", "API", "LOCAL_RULE", "MANUAL"] },
+        "category": { "type": "string" },
+        "stage": { "type": "string", "enum": ["ACUTE_FAST", "ACUTE_DETAIL", "PROFILE", "DOCTOR", "ATTACHMENTS", "REVIEW"] },
+        "prompt": { "type": "string" },
+        "shortLabel": { "type": "string" },
+        "helpText": { "type": ["string", "null"] },
+        "answerType": { "type": "string", "enum": ["BOOLEAN", "SCALE", "SINGLE_SELECT", "MULTI_SELECT", "FREE_TEXT", "NUMBER", "DATE_TIME", "DURATION", "ATTACHMENT_REQUEST", "VOICE_NOTE", "MEDICATION_LIST"] },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "priority": { "type": "integer" },
+        "required": { "type": "boolean" },
+        "skippable": { "type": "boolean" },
+        "voiceAllowed": { "type": "boolean" },
+        "visibleIf": { "type": ["string", "null"] },
+        "exportToClinician": { "type": "boolean" },
+        "redFlagWeight": { "type": "integer" },
+        "aiEligible": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "active": { "type": "boolean" }
+      }
+    }
+  }
+}

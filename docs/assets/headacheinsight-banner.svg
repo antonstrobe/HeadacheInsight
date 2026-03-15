@@ -1,0 +1,29 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="56" x2="1180" y2="608" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D141C"/>
+      <stop offset="1" stop-color="#17222E"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(941 172) rotate(90) scale(214 214)">
+      <stop stop-color="#D14343" stop-opacity="0.52"/>
+      <stop offset="1" stop-color="#D14343" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="762" y1="128" x2="1081" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5D738B"/>
+      <stop offset="1" stop-color="#7AC7C4"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="1232" height="592" rx="40" fill="url(#bg)"/>
+  <circle cx="940" cy="176" r="214" fill="url(#glow)"/>
+  <circle cx="915" cy="230" r="154" stroke="url(#ring)" stroke-width="22"/>
+  <path d="M834 232C872 198 924 178 981 178C1065 178 1139 222 1185 290L1132 331C1098 279 1042 247 977 247C934 247 894 258 860 281L834 232Z" fill="#F3F6F8"/>
+  <circle cx="954" cy="178" r="24" fill="#D14343"/>
+  <path d="M132 184H233C267 184 295 212 295 246V394C295 428 267 456 233 456H132C98 456 70 428 70 394V246C70 212 98 184 132 184Z" fill="#111A24" stroke="#304252" stroke-width="2"/>
+  <path d="M182 214C138 214 102 250 102 294C102 338 138 374 182 374C226 374 262 338 262 294C262 250 226 214 182 214Z" fill="#D14343"/>
+  <path d="M149 296C158 287 171 281 185 281C207 281 226 291 239 307L226 319C216 307 201 300 184 300C172 300 161 304 152 311L149 296Z" fill="#FAFAFA"/>
+  <path d="M356 212H660" stroke="#385164" stroke-width="2"/>
+  <path d="M356 428H720" stroke="#385164" stroke-width="2"/>
+  <text x="356" y="288" fill="#F4F7F8" font-family="Segoe UI, Arial, sans-serif" font-size="74" font-weight="700">HeadacheInsight</text>
+  <text x="356" y="352" fill="#90A8BA" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="500">Privacy-first migraine journal with offline-first capture and structured analysis</text>
+  <text x="356" y="404" fill="#7AC7C4" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">Android • Kotlin • Compose • FastAPI • Secure backend proxy</text>
+</svg>

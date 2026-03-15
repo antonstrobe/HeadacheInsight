@@ -1,0 +1,18 @@
+<resources>
+    <string name="quicklog_title">Acute Quick Mode</string>
+    <string name="quicklog_subtitle">Save a partial entry now and return later.</string>
+    <string name="quicklog_episode_id">Episode ID: %1$s</string>
+    <string name="quicklog_episode_creating">creating…</string>
+    <string name="quicklog_symptoms_title">Symptoms</string>
+    <string name="quicklog_red_flags_title">Red flags first</string>
+    <string name="quicklog_red_flag_sudden">Sudden / worst pain</string>
+    <string name="quicklog_red_flag_confusion">Confusion</string>
+    <string name="quicklog_red_flag_speech">Speech difficulty</string>
+    <string name="quicklog_red_flag_weakness">One-sided weakness</string>
+    <string name="quicklog_medication_title">Medication notes</string>
+    <string name="quicklog_medication_label">What have you taken?</string>
+    <string name="quicklog_voice_start">Start voice note</string>
+    <string name="quicklog_voice_stop">Stop voice note</string>
+    <string name="quicklog_save_now">Save now</string>
+    <string name="quicklog_audio_saved">Audio saved: %1$s</string>
+</resources>

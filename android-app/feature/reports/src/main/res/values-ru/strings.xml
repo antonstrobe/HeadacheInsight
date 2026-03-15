@@ -1,0 +1,6 @@
+<resources>
+    <string name="reports_patient_title">Отчёт для пациента</string>
+    <string name="reports_clinician_title">Отчёт для врача</string>
+    <string name="reports_loading">Загрузка…</string>
+    <string name="reports_export">Экспорт PDF / CSV / JSON</string>
+</resources>

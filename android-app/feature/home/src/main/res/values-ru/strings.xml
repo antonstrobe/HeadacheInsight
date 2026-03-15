@@ -1,0 +1,17 @@
+<resources>
+    <string name="home_pain_button">У меня болит голова</string>
+    <string name="home_status_title">Статус</string>
+    <string name="home_status_subtitle">Офлайн-ядро с опциональным облачным анализом</string>
+    <string name="home_cloud_enabled">Облако включено</string>
+    <string name="home_local_only">Только локально</string>
+    <string name="home_queue_count">Очередь %1$d</string>
+    <string name="home_monthly_headache_days">Дней с головной болью за месяц: %1$d</string>
+    <string name="home_continue_episode">Продолжить незавершённую запись</string>
+    <string name="home_history">История</string>
+    <string name="home_profile">Профиль</string>
+    <string name="home_attachments">Вложения / анализы</string>
+    <string name="home_reports">Отчёт врачу</string>
+    <string name="home_new_questions">Создать новые вопросы</string>
+    <string name="home_settings">Настройки</string>
+    <string name="home_sync_queue">Очередь синхронизации</string>
+</resources>

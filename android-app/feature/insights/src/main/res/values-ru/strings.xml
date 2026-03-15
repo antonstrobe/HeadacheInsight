@@ -1,0 +1,8 @@
+<resources>
+    <string name="insights_headache_days_title">Дни с головной болью за месяц</string>
+    <string name="insights_severity_title">Тренд боли</string>
+    <string name="insights_average_severity">Средний уровень боли: %1$.1f</string>
+    <string name="insights_medication_days_title">Дни приёма лекарств</string>
+    <string name="insights_functional_impact_title">Функциональное влияние</string>
+    <string name="insights_triggers_title">Предполагаемые триггеры</string>
+</resources>

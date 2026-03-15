@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_cloud_title">Cloud analysis</string>
+    <string name="settings_backend_title">Backend URL</string>
+    <string name="settings_backend_label">Backend URL</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_subtitle">Use one of the two startup languages. Chinese will be added next.</string>
+    <string name="settings_language_russian">Русский</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_selected">Selected: %1$s</string>
+    <string name="settings_save">Save settings</string>
+</resources>

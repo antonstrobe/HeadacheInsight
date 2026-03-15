@@ -1,0 +1,8 @@
+<resources>
+    <string name="insights_headache_days_title">Monthly headache days</string>
+    <string name="insights_severity_title">Severity trend</string>
+    <string name="insights_average_severity">Average severity: %1$.1f</string>
+    <string name="insights_medication_days_title">Medication days</string>
+    <string name="insights_functional_impact_title">Functional impact</string>
+    <string name="insights_triggers_title">Suspected triggers</string>
+</resources>

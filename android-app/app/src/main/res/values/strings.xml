@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">HeadacheInsight</string>
+    <string name="language_screen_title">Choose app language</string>
+    <string name="language_screen_subtitle">You can change it later in settings.</string>
+    <string name="language_screen_description">Russian and English are available now. Chinese will be added next.</string>
+    <string name="language_option_russian">Русский</string>
+    <string name="language_option_russian_subtitle">Start with the Russian interface.</string>
+    <string name="language_option_english">English</string>
+    <string name="language_option_english_subtitle">Use the English interface.</string>
+    <string name="language_next_title">Next languages</string>
+    <string name="language_next_subtitle">The selector will grow over time.</string>
+    <string name="language_next_description">This first version keeps language selection simple: two large buttons at startup.</string>
+</resources>

@@ -1,0 +1,15 @@
+<resources>
+    <string name="onboarding_privacy_title">Приватность и безопасность</string>
+    <string name="onboarding_privacy_subtitle">HeadacheInsight не является медицинским изделием и не ставит диагноз. Приложение работает офлайн, а облачный анализ можно отключить.</string>
+    <string name="onboarding_privacy_body">Используйте приложение, чтобы собирать структурированные данные для себя и для разговора с врачом.</string>
+    <string name="onboarding_profile_title">Базовый профиль</string>
+    <string name="onboarding_name_label">Имя или удобное обращение</string>
+    <string name="onboarding_city_label">Город / регион (примерно)</string>
+    <string name="onboarding_cloud_title">Включить облачный анализ</string>
+    <string name="onboarding_cloud_subtitle">Структурированный анализ через ваш сервер. Приложение остаётся полезным и без него.</string>
+    <string name="onboarding_location_title">Разрешить приблизительную геолокацию</string>
+    <string name="onboarding_location_subtitle">Сохраняем только снимки города или региона, когда это уместно.</string>
+    <string name="onboarding_attachment_title">Разрешить загрузку вложений</string>
+    <string name="onboarding_attachment_subtitle">Нужно только если вы хотите облачную обработку файлов и изображений.</string>
+    <string name="onboarding_continue">Продолжить</string>
+</resources>
