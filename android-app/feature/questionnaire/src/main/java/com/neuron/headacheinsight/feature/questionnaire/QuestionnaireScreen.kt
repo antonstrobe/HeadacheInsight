@@ -1,13 +1,18 @@
 package com.neuron.headacheinsight.feature.questionnaire
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,41 +85,64 @@ fun QuestionnaireScreen(
     onHome: () -> Unit,
 ) {
     val answers = remember { mutableStateMapOf<String, String>() }
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        if (questions.isEmpty()) {
-            item {
-                EmptyState(
-                    title = stringResource(R.string.questionnaire_empty_title),
-                    subtitle = stringResource(R.string.questionnaire_empty_subtitle),
-                )
-            }
-        }
-        items(questions, key = { it.id }) { question ->
-            HeadacheInsightSectionCard(
-                title = question.shortLabel,
-                supportingText = question.prompt,
-            ) {
-                OutlinedTextField(
-                    value = answers[question.id].orEmpty(),
-                    onValueChange = { answers[question.id] = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(question.helpText ?: stringResource(R.string.questionnaire_answer_label)) },
-                )
-                Button(onClick = { onSaveAnswer(question.id, answers[question.id].orEmpty()) }) {
-                    Text(stringResource(R.string.questionnaire_save))
+    Scaffold(
+        bottomBar = {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    BottomMenuActions(
+                        onBack = onBack,
+                        onHome = onHome,
+                    )
                 }
             }
         }
-        item {
-            BottomMenuActions(
-                onBack = onBack,
-                onHome = onHome,
-            )
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                HeadacheInsightSectionCard(
+                    title = stringResource(R.string.questionnaire_title),
+                    supportingText = stringResource(R.string.questionnaire_subtitle),
+                ) {
+                    Text(stringResource(R.string.questionnaire_answer_help))
+                }
+            }
+            if (questions.isEmpty()) {
+                item {
+                    EmptyState(
+                        title = stringResource(R.string.questionnaire_empty_title),
+                        subtitle = stringResource(R.string.questionnaire_empty_subtitle),
+                    )
+                }
+            }
+            items(questions, key = { it.id }) { question ->
+                HeadacheInsightSectionCard(
+                    title = question.shortLabel,
+                    supportingText = question.prompt,
+                ) {
+                    OutlinedTextField(
+                        value = answers[question.id].orEmpty(),
+                        onValueChange = { answers[question.id] = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(question.helpText ?: stringResource(R.string.questionnaire_answer_label)) },
+                    )
+                    Button(onClick = { onSaveAnswer(question.id, answers[question.id].orEmpty()) }) {
+                        Text(stringResource(R.string.questionnaire_save))
+                    }
+                }
+            }
         }
     }
 }

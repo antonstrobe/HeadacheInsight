@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -107,75 +109,86 @@ fun HomeScreen(
         add(HomeActionItem(label = stringResource(R.string.home_sync_queue), onClick = onSync))
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = stringResource(R.string.home_info_title),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = stringResource(R.string.home_info_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-
-        HeadacheInsightSectionCard(
-            title = stringResource(R.string.home_status_title),
-            supportingText = stringResource(R.string.home_status_subtitle),
-        ) {
-            HeadacheInsightStatusBadge(
-                label = if (state.cloudEnabled) {
-                    stringResource(R.string.home_cloud_enabled)
-                } else {
-                    stringResource(R.string.home_local_only)
-                },
-                color = if (state.cloudEnabled) {
-                    HeadacheInsightStatusColors.CloudAnalyzed
-                } else {
-                    HeadacheInsightStatusColors.LocalComplete
-                },
-            )
-            HeadacheInsightStatusBadge(
-                label = stringResource(R.string.home_queue_count, state.queueCount),
-                color = if (state.queueCount == 0) {
-                    HeadacheInsightStatusColors.LocalComplete
-                } else {
-                    HeadacheInsightStatusColors.Queued
-                },
-            )
-            Text(
-                text = stringResource(R.string.home_monthly_headache_days, state.monthlyHeadacheDays),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            state.pendingEpisode?.let { pending ->
-                Button(
-                    onClick = { onContinueEpisode(pending.id) },
+    Scaffold(
+        bottomBar = {
+            Surface {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp),
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.home_continue_episode),
-                        style = MaterialTheme.typography.titleMedium,
+                    state.pendingEpisode?.let { pending ->
+                        Button(
+                            onClick = { onContinueEpisode(pending.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_continue_episode),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    HeadacheInsightPrimaryPainButton(
+                        label = stringResource(R.string.home_pain_button),
+                        icon = Icons.Outlined.MedicalServices,
+                        onClick = onStartEpisode,
                     )
                 }
+            }
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.home_info_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+                Text(
+                    text = stringResource(R.string.home_info_subtitle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+
+            HeadacheInsightSectionCard(
+                title = stringResource(R.string.home_status_title),
+                supportingText = stringResource(R.string.home_status_subtitle),
+            ) {
+                HeadacheInsightStatusBadge(
+                    label = if (state.cloudEnabled) {
+                        stringResource(R.string.home_cloud_enabled)
+                    } else {
+                        stringResource(R.string.home_local_only)
+                    },
+                    color = if (state.cloudEnabled) {
+                        HeadacheInsightStatusColors.CloudAnalyzed
+                    } else {
+                        HeadacheInsightStatusColors.LocalComplete
+                    },
+                )
+                HeadacheInsightStatusBadge(
+                    label = stringResource(R.string.home_queue_count, state.queueCount),
+                    color = if (state.queueCount == 0) {
+                        HeadacheInsightStatusColors.LocalComplete
+                    } else {
+                        HeadacheInsightStatusColors.Queued
+                    },
+                )
+                Text(
+                    text = stringResource(R.string.home_monthly_headache_days, state.monthlyHeadacheDays),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
 
             HeadacheInsightSectionCard(
@@ -185,7 +198,7 @@ fun HomeScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 270.dp)
+                        .heightIn(max = 360.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -209,12 +222,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            HeadacheInsightPrimaryPainButton(
-                label = stringResource(R.string.home_pain_button),
-                icon = Icons.Outlined.MedicalServices,
-                onClick = onStartEpisode,
-            )
         }
     }
 }

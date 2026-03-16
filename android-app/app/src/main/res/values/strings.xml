@@ -3,7 +3,7 @@
     <string name="language_screen_title">Choose app language</string>
     <string name="language_screen_subtitle">You can change it later in settings.</string>
     <string name="language_screen_description">Russian and English are available now. Chinese will be added next.</string>
-    <string name="language_option_russian">Русский</string>
+    <string name="language_option_russian">Russian</string>
     <string name="language_option_russian_subtitle">Start with the Russian interface.</string>
     <string name="language_option_english">English</string>
     <string name="language_option_english_subtitle">Use the English interface.</string>

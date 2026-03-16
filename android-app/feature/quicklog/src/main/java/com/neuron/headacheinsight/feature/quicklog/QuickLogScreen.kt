@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,6 +75,7 @@ data class QuickLogUiState(
     val speechDifficulty: Boolean = false,
     val oneSidedWeakness: Boolean = false,
     val medicineNotes: String = "",
+    val notesText: String = "",
     val interruptedBySafety: Boolean = false,
     val urgentMessage: String = "",
     val isRecording: Boolean = false,
@@ -113,6 +118,7 @@ class QuickLogViewModel @Inject constructor(
     fun setSpeechDifficulty(value: Boolean) = draft.tryEmit(state.value.copy(speechDifficulty = value))
     fun setOneSidedWeakness(value: Boolean) = draft.tryEmit(state.value.copy(oneSidedWeakness = value))
     fun setMedicineNotes(value: String) = draft.tryEmit(state.value.copy(medicineNotes = value))
+    fun setNotesText(value: String) = draft.tryEmit(state.value.copy(notesText = value))
     fun setVoiceError(value: String?) = draft.tryEmit(state.value.copy(voiceErrorMessage = value))
 
     fun toggleRecording() {
@@ -148,11 +154,15 @@ class QuickLogViewModel @Inject constructor(
         val episode = state.value.episode ?: return
         val normalized = transcriptText.trim()
         if (normalized.isBlank()) return
+        val mergedText = listOf(state.value.notesText.trim(), normalized)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString("\n")
         viewModelScope.launch {
             val now = timeProvider.now()
             episodeRepository.updateEpisode(
                 episode.copy(
-                    summaryText = normalized,
+                    summaryText = mergedText,
                     transcriptStatus = TranscriptStatus.LOCAL_READY,
                     updatedAt = now,
                 ),
@@ -173,6 +183,7 @@ class QuickLogViewModel @Inject constructor(
             )
             draft.emit(
                 state.value.copy(
+                    notesText = mergedText,
                     lastTranscriptText = normalized,
                     voiceErrorMessage = null,
                 ),
@@ -192,7 +203,7 @@ class QuickLogViewModel @Inject constructor(
         )
         viewModelScope.launch {
             saveQuickLogUseCase(
-                episode = episode,
+                episode = episode.copy(summaryText = state.value.notesText.ifBlank { episode.summaryText }),
                 severity = state.value.severity,
                 symptoms = state.value.selectedSymptoms.map {
                     EpisodeSymptom(
@@ -232,6 +243,7 @@ fun QuickLogRoute(
         onSpeechDifficultyChanged = viewModel::setSpeechDifficulty,
         onOneSidedWeaknessChanged = viewModel::setOneSidedWeakness,
         onMedicineNotesChanged = viewModel::setMedicineNotes,
+        onNotesTextChanged = viewModel::setNotesText,
         onSaveOfflineDictation = viewModel::saveOfflineDictation,
         onToggleVoiceRecording = viewModel::toggleRecording,
         onVoiceError = viewModel::setVoiceError,
@@ -251,6 +263,7 @@ fun QuickLogScreen(
     onSpeechDifficultyChanged: (Boolean) -> Unit,
     onOneSidedWeaknessChanged: (Boolean) -> Unit,
     onMedicineNotesChanged: (String) -> Unit,
+    onNotesTextChanged: (String) -> Unit,
     onSaveOfflineDictation: (String) -> Unit,
     onToggleVoiceRecording: () -> Unit,
     onVoiceError: (String?) -> Unit,
@@ -310,100 +323,127 @@ fun QuickLogScreen(
         dictationLauncher.launch(intent)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        HeadacheInsightSectionCard(
-            title = stringResource(R.string.quicklog_title),
-            supportingText = stringResource(R.string.quicklog_subtitle),
+    Scaffold(
+        bottomBar = {
+            Surface {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.quicklog_save_now))
+                    }
+                    BottomMenuActions(
+                        onBack = onBack,
+                        onHome = onHome,
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                stringResource(
-                    R.string.quicklog_episode_id,
-                    state.episode?.id ?: stringResource(R.string.quicklog_episode_creating),
-                ),
-            )
-            SeveritySlider(severity = state.severity, onSeverityChanged = onSeverityChanged)
-        }
+            HeadacheInsightSectionCard(
+                title = stringResource(R.string.quicklog_title),
+                supportingText = stringResource(R.string.quicklog_subtitle),
+            ) {
+                Text(
+                    stringResource(
+                        R.string.quicklog_episode_id,
+                        state.episode?.id ?: stringResource(R.string.quicklog_episode_creating),
+                    ),
+                )
+                SeveritySlider(severity = state.severity, onSeverityChanged = onSeverityChanged)
+            }
 
-        SelectableChipGroup(
-            title = stringResource(R.string.quicklog_symptoms_title),
-            options = listOf("nausea", "photophobia", "phonophobia", "dizziness", "aura", "neck pain"),
-            selected = state.selectedSymptoms,
-            onToggle = onToggleSymptom,
-        )
+            SelectableChipGroup(
+                title = stringResource(R.string.quicklog_symptoms_title),
+                options = listOf("nausea", "photophobia", "phonophobia", "dizziness", "aura", "neck pain"),
+                selected = state.selectedSymptoms,
+                onToggle = onToggleSymptom,
+            )
 
-        HeadacheInsightSectionCard(title = stringResource(R.string.quicklog_red_flags_title)) {
-            RedFlagToggle(
-                title = stringResource(R.string.quicklog_red_flag_sudden),
-                value = state.suddenWorstPain,
-                onValueChange = onSuddenWorstPainChanged,
-            )
-            RedFlagToggle(
-                title = stringResource(R.string.quicklog_red_flag_confusion),
-                value = state.confusion,
-                onValueChange = onConfusionChanged,
-            )
-            RedFlagToggle(
-                title = stringResource(R.string.quicklog_red_flag_speech),
-                value = state.speechDifficulty,
-                onValueChange = onSpeechDifficultyChanged,
-            )
-            RedFlagToggle(
-                title = stringResource(R.string.quicklog_red_flag_weakness),
-                value = state.oneSidedWeakness,
-                onValueChange = onOneSidedWeaknessChanged,
-            )
-        }
+            HeadacheInsightSectionCard(title = stringResource(R.string.quicklog_red_flags_title)) {
+                RedFlagToggle(
+                    title = stringResource(R.string.quicklog_red_flag_sudden),
+                    value = state.suddenWorstPain,
+                    onValueChange = onSuddenWorstPainChanged,
+                )
+                RedFlagToggle(
+                    title = stringResource(R.string.quicklog_red_flag_confusion),
+                    value = state.confusion,
+                    onValueChange = onConfusionChanged,
+                )
+                RedFlagToggle(
+                    title = stringResource(R.string.quicklog_red_flag_speech),
+                    value = state.speechDifficulty,
+                    onValueChange = onSpeechDifficultyChanged,
+                )
+                RedFlagToggle(
+                    title = stringResource(R.string.quicklog_red_flag_weakness),
+                    value = state.oneSidedWeakness,
+                    onValueChange = onOneSidedWeaknessChanged,
+                )
+            }
 
-        HeadacheInsightSectionCard(title = stringResource(R.string.quicklog_medication_title)) {
-            OutlinedTextField(
-                value = state.medicineNotes,
-                onValueChange = onMedicineNotesChanged,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.quicklog_medication_label)) },
-            )
-        }
+            HeadacheInsightSectionCard(title = stringResource(R.string.quicklog_notes_title)) {
+                OutlinedTextField(
+                    value = state.notesText,
+                    onValueChange = onNotesTextChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.quicklog_notes_label)) },
+                    minLines = 3,
+                )
+                OutlinedButton(onClick = ::handleOfflineDictation, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.quicklog_dictation_start))
+                }
+                Button(onClick = ::handleVoiceButton, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        if (state.isRecording) {
+                            stringResource(R.string.quicklog_voice_stop)
+                        } else {
+                            stringResource(R.string.quicklog_voice_start)
+                        },
+                    )
+                }
+            }
 
-        OutlinedButton(onClick = ::handleOfflineDictation, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.quicklog_dictation_start))
+            HeadacheInsightSectionCard(title = stringResource(R.string.quicklog_medication_title)) {
+                OutlinedTextField(
+                    value = state.medicineNotes,
+                    onValueChange = onMedicineNotesChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.quicklog_medication_label)) },
+                )
+            }
+
+            if (permissionDenied) {
+                Text(stringResource(R.string.quicklog_audio_permission_required))
+            }
+            state.lastAudioPath?.let {
+                Text(stringResource(R.string.quicklog_audio_saved, it))
+            }
+            state.lastTranscriptText?.let {
+                Text(stringResource(R.string.quicklog_dictation_saved, it))
+            }
+            state.voiceErrorMessage?.let {
+                Text(stringResource(R.string.quicklog_voice_error, it))
+            }
+            if (state.urgentMessage.isNotBlank()) {
+                Text(state.urgentMessage)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-        Button(onClick = ::handleVoiceButton, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                if (state.isRecording) {
-                    stringResource(R.string.quicklog_voice_stop)
-                } else {
-                    stringResource(R.string.quicklog_voice_start)
-                },
-            )
-        }
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.quicklog_save_now))
-        }
-        if (permissionDenied) {
-            Text(stringResource(R.string.quicklog_audio_permission_required))
-        }
-        state.lastAudioPath?.let {
-            Text(stringResource(R.string.quicklog_audio_saved, it))
-        }
-        state.lastTranscriptText?.let {
-            Text(stringResource(R.string.quicklog_dictation_saved, it))
-        }
-        state.voiceErrorMessage?.let {
-            Text(stringResource(R.string.quicklog_voice_error, it))
-        }
-        if (state.urgentMessage.isNotBlank()) {
-            Text(state.urgentMessage)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        BottomMenuActions(
-            onBack = onBack,
-            onHome = onHome,
-        )
     }
 }
 

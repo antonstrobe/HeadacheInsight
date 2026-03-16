@@ -1,4 +1,7 @@
 <resources>
+    <string name="questionnaire_title">New questions</string>
+    <string name="questionnaire_subtitle">Answer the most relevant follow-up questions for the current episode.</string>
+    <string name="questionnaire_answer_help">You can save partial answers and come back later.</string>
     <string name="questionnaire_answer_label">Answer</string>
     <string name="questionnaire_save">Save</string>
     <string name="questionnaire_empty_title">No questions yet</string>

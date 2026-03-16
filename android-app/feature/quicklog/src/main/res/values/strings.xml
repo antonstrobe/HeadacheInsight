@@ -9,6 +9,8 @@
     <string name="quicklog_red_flag_confusion">Confusion</string>
     <string name="quicklog_red_flag_speech">Speech difficulty</string>
     <string name="quicklog_red_flag_weakness">One-sided weakness</string>
+    <string name="quicklog_notes_title">What are you feeling right now?</string>
+    <string name="quicklog_notes_label">Short note or dictated text</string>
     <string name="quicklog_medication_title">Medication notes</string>
     <string name="quicklog_medication_label">What have you taken?</string>
     <string name="quicklog_dictation_start">Start offline dictation</string>

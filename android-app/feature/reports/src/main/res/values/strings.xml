@@ -1,6 +1,6 @@
 <resources>
     <string name="reports_patient_title">Patient report</string>
     <string name="reports_clinician_title">Clinician report</string>
-    <string name="reports_loading">Loading…</string>
+    <string name="reports_loading">Loading...</string>
     <string name="reports_export">Export PDF / CSV / JSON</string>
 </resources>

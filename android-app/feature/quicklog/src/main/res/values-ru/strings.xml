@@ -9,6 +9,8 @@
     <string name="quicklog_red_flag_confusion">Спутанность сознания</string>
     <string name="quicklog_red_flag_speech">Нарушение речи</string>
     <string name="quicklog_red_flag_weakness">Слабость с одной стороны</string>
+    <string name="quicklog_notes_title">Что вы чувствуете прямо сейчас?</string>
+    <string name="quicklog_notes_label">Короткая заметка или текст из диктовки</string>
     <string name="quicklog_medication_title">Лекарства</string>
     <string name="quicklog_medication_label">Что уже приняли?</string>
     <string name="quicklog_dictation_start">Начать офлайн-диктовку</string>

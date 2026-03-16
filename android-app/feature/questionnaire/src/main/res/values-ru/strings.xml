@@ -1,4 +1,7 @@
 <resources>
+    <string name="questionnaire_title">Новые вопросы</string>
+    <string name="questionnaire_subtitle">Ответьте на самые важные уточняющие вопросы для текущего эпизода.</string>
+    <string name="questionnaire_answer_help">Можно сохранить частичные ответы и вернуться позже.</string>
     <string name="questionnaire_answer_label">Ответ</string>
     <string name="questionnaire_save">Сохранить</string>
     <string name="questionnaire_empty_title">Вопросов пока нет</string>

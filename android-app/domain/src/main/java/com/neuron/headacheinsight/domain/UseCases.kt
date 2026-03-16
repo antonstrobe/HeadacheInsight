@@ -182,7 +182,7 @@ class EnsureSeedQuestionsUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     suspend operator fun invoke(settings: AppSettings) {
-        val seedVersion = "v2:${settings.languageTag}"
+        val seedVersion = "v3:${settings.languageTag}"
         if (settings.lastSeedVersion == seedVersion) return
         val questions = questionSeedSource.loadSeedQuestions(settings.languageTag)
         questionRepository.replaceSeedQuestions(questions, seedVersion)

@@ -16,7 +16,7 @@ class SeedQuestionAssetSource @Inject constructor(
     @ApplicationContext private val context: Context,
     private val json: Json,
 ) : QuestionSeedSource {
-    override fun observeSeedVersion(): Flow<String?> = flowOf("v2")
+    override fun observeSeedVersion(): Flow<String?> = flowOf("v3")
 
     override suspend fun loadSeedQuestions(languageTag: String): List<QuestionTemplate> {
         val englishQuestions = loadFromAsset("seed_questions_en.json")

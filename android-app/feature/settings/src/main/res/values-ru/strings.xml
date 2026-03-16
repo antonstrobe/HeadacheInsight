@@ -2,12 +2,12 @@
     <string name="settings_cloud_title">Облачный анализ</string>
     <string name="settings_cloud_subtitle">Включайте удалённый анализ только тогда, когда нужны структурированные ответы от вашего сервера.</string>
     <string name="settings_backend_title">Сервер анализа</string>
-    <string name="settings_backend_subtitle">Укажите адрес вашего сервера анализа.</string>
+    <string name="settings_backend_subtitle">Укажите адрес вашего backend или proxy.</string>
     <string name="settings_backend_label">URL сервера</string>
     <string name="settings_openai_title">OpenAI / ChatGPT API</string>
-    <string name="settings_openai_subtitle">Введите свой API-ключ прямо в приложении. Он хранится локально в изолированном хранилище Android и отправляется только на ваш сервер по HTTPS.</string>
+    <string name="settings_openai_subtitle">Введите свой API-ключ прямо в приложении. Он хранится в изолированном хранилище Android и отправляется только на ваш сервер по HTTPS.</string>
     <string name="settings_openai_key_label">API-ключ</string>
-    <string name="settings_openai_storage_note">Ключ сохраняется локально в защищённом хранилище Android Keystore.</string>
+    <string name="settings_openai_storage_note">Хранится локально в защищённом хранилище Android Keystore.</string>
     <string name="settings_key_show">Показать ключ</string>
     <string name="settings_key_hide">Скрыть ключ</string>
     <string name="settings_models_title">Модели</string>
@@ -16,7 +16,7 @@
     <string name="settings_question_model_label">Модель вопросов</string>
     <string name="settings_transcribe_model_label">Модель транскрибации</string>
     <string name="settings_local_speech_title">Офлайн-модель речи</string>
-    <string name="settings_local_speech_subtitle">Установите локальный речевой пакет устройства, чтобы приложение могло включить офлайн-диктовку на этом телефоне.</string>
+    <string name="settings_local_speech_subtitle">Установите речевой пакет устройства, чтобы приложение могло включить локальную диктовку на этом телефоне.</string>
     <string name="settings_local_speech_refresh">Проверить статус локальной речи</string>
     <string name="settings_local_speech_install">Установить офлайн-модель речи</string>
     <string name="settings_local_speech_progress">Прогресс загрузки: %1$d%%</string>

@@ -8,6 +8,6 @@
     <string name="language_option_english">English</string>
     <string name="language_option_english_subtitle">Открыть интерфейс на английском языке.</string>
     <string name="language_next_title">Следующие языки</string>
-    <string name="language_next_subtitle">Со временем селектор станет шире.</string>
+    <string name="language_next_subtitle">Селектор будет расширяться постепенно.</string>
     <string name="language_next_description">В первой версии выбор языка упрощён: на старте доступны две большие кнопки.</string>
 </resources>
