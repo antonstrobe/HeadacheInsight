@@ -1,3 +1,5 @@
 <resources>
     <string name="attachments_meta">%1$s • %2$s • %3$s</string>
+    <string name="attachments_empty_title">Вложений пока нет</string>
+    <string name="attachments_empty_subtitle">После добавления сюда будут попадать изображения, PDF, аудиозаметки и документы.</string>
 </resources>

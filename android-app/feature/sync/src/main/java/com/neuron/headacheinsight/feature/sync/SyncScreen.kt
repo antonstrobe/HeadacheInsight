@@ -16,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.SyncQueueItem
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.EmptyState
 import com.neuron.headacheinsight.core.ui.localizedSyncOperation
 import com.neuron.headacheinsight.core.ui.localizedSyncStatus
 import com.neuron.headacheinsight.domain.SyncRepository
@@ -35,15 +37,23 @@ class SyncViewModel @Inject constructor(
 
 @Composable
 fun SyncRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: SyncViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    SyncScreen(state)
+    SyncScreen(
+        items = state,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun SyncScreen(
     items: List<SyncQueueItem>,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -51,6 +61,14 @@ fun SyncScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (items.isEmpty()) {
+            item {
+                EmptyState(
+                    title = stringResource(R.string.sync_empty_title),
+                    subtitle = stringResource(R.string.sync_empty_subtitle),
+                )
+            }
+        }
         items(items, key = { it.id }) { item ->
             HeadacheInsightSectionCard(
                 title = localizedSyncOperation(item.operationType),
@@ -62,6 +80,12 @@ fun SyncScreen(
             ) {
                 item.lastError?.let { Text(it) }
             }
+        }
+        item {
+            BottomMenuActions(
+                onBack = onBack,
+                onHome = onHome,
+            )
         }
     }
 }

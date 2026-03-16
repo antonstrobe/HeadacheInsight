@@ -30,7 +30,10 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.CloudCredentials
+import com.neuron.headacheinsight.core.model.LocalSpeechPackState
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
+import com.neuron.headacheinsight.domain.LocalSpeechPackManager
 import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -43,20 +46,24 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val appSettings: AppSettings = AppSettings(),
     val cloudCredentials: CloudCredentials = CloudCredentials(),
+    val localSpeechPack: LocalSpeechPackState = LocalSpeechPackState(),
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
+    private val localSpeechPackManager: LocalSpeechPackManager,
 ) : androidx.lifecycle.ViewModel() {
     val state: StateFlow<SettingsUiState> = combine(
         settingsRepository.observeSettings(),
         cloudCredentialsRepository.observeCredentials(),
-    ) { settings, cloudCredentials ->
+        localSpeechPackManager.observeState(),
+    ) { settings, cloudCredentials, localSpeechPack ->
         SettingsUiState(
             appSettings = settings,
             cloudCredentials = cloudCredentials,
+            localSpeechPack = localSpeechPack,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -91,6 +98,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun refreshLocalSpeech(languageTag: String) {
+        viewModelScope.launch {
+            localSpeechPackManager.refresh(languageTag)
+        }
+    }
+
+    fun installLocalSpeech(languageTag: String) {
+        viewModelScope.launch {
+            localSpeechPackManager.install(languageTag)
+        }
+    }
+
     private companion object {
         const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8000/"
     }
@@ -98,16 +117,32 @@ class SettingsViewModel @Inject constructor(
 
 @Composable
 fun SettingsRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    SettingsScreen(state = state, onSave = viewModel::save)
+    androidx.compose.runtime.LaunchedEffect(state.appSettings.languageTag) {
+        viewModel.refreshLocalSpeech(state.appSettings.languageTag)
+    }
+    SettingsScreen(
+        state = state,
+        onSave = viewModel::save,
+        onRefreshLocalSpeech = viewModel::refreshLocalSpeech,
+        onInstallLocalSpeech = viewModel::installLocalSpeech,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
     onSave: (Boolean, String, String, String, String, String, String) -> Unit,
+    onRefreshLocalSpeech: (String) -> Unit,
+    onInstallLocalSpeech: (String) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     val settings = state.appSettings
     val cloudCredentials = state.cloudCredentials
@@ -204,6 +239,30 @@ fun SettingsScreen(
         }
 
         HeadacheInsightSectionCard(
+            title = stringResource(R.string.settings_local_speech_title),
+            supportingText = stringResource(R.string.settings_local_speech_subtitle),
+        ) {
+            Text(localSpeechStatusLabel(state.localSpeechPack))
+            state.localSpeechPack.progressPercent?.let { progress ->
+                Text(stringResource(R.string.settings_local_speech_progress, progress))
+            }
+            OutlinedButton(
+                onClick = { onRefreshLocalSpeech(languageState) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.localSpeechPack.isBusy,
+            ) {
+                Text(stringResource(R.string.settings_local_speech_refresh))
+            }
+            Button(
+                onClick = { onInstallLocalSpeech(languageState) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.localSpeechPack.isBusy && !state.localSpeechPack.isInstalled,
+            ) {
+                Text(stringResource(R.string.settings_local_speech_install))
+            }
+        }
+
+        HeadacheInsightSectionCard(
             title = stringResource(R.string.settings_language_title),
             supportingText = stringResource(R.string.settings_language_subtitle),
         ) {
@@ -235,7 +294,23 @@ fun SettingsScreen(
         ) {
             Text(stringResource(R.string.settings_save))
         }
+        BottomMenuActions(
+            onBack = onBack,
+            onHome = onHome,
+        )
     }
+}
+
+@Composable
+private fun localSpeechStatusLabel(state: LocalSpeechPackState): String = when (state.status) {
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.UNKNOWN -> stringResource(R.string.settings_local_speech_status_unknown)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.CHECKING -> stringResource(R.string.settings_local_speech_status_checking)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.READY -> stringResource(R.string.settings_local_speech_status_ready)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.NOT_INSTALLED -> stringResource(R.string.settings_local_speech_status_not_installed)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.INSTALLING -> stringResource(R.string.settings_local_speech_status_installing)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.SCHEDULED -> stringResource(R.string.settings_local_speech_status_scheduled)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.UNSUPPORTED -> stringResource(R.string.settings_local_speech_status_unsupported)
+    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.ERROR -> stringResource(R.string.settings_local_speech_status_error)
 }
 
 @Composable

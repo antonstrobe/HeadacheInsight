@@ -5,4 +5,6 @@
     <string name="insights_medication_days_title">Medication days</string>
     <string name="insights_functional_impact_title">Functional impact</string>
     <string name="insights_triggers_title">Suspected triggers</string>
+    <string name="insights_history_title">Episode history</string>
+    <string name="insights_history_subtitle">Open a recorded episode to review its timeline, transcripts, and follow-up details.</string>
 </resources>

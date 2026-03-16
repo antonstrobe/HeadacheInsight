@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.ReportBundle
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.domain.BuildReportsUseCase
 import com.neuron.headacheinsight.domain.ReportRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,21 +52,31 @@ class ReportsViewModel @Inject constructor(
 
 @Composable
 fun ReportsRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: ReportsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.load() }
-    ReportsScreen(bundle = state, onExport = viewModel::export)
+    ReportsScreen(
+        bundle = state,
+        onExport = viewModel::export,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun ReportsScreen(
     bundle: ReportBundle?,
     onExport: () -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -76,5 +89,9 @@ fun ReportsScreen(
         Button(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.reports_export))
         }
+        BottomMenuActions(
+            onBack = onBack,
+            onHome = onHome,
+        )
     }
 }

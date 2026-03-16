@@ -3,6 +3,7 @@ package com.neuron.headacheinsight.domain
 import com.neuron.headacheinsight.core.model.Attachment
 import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.EpisodeTranscript
+import com.neuron.headacheinsight.core.model.LocalSpeechPackState
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import kotlinx.coroutines.flow.Flow
 
@@ -15,6 +16,12 @@ interface SpeechRecognizerEngine {
 interface LocalSpeechRecognizerEngine : SpeechRecognizerEngine
 
 interface CloudSpeechRecognizerEngine : SpeechRecognizerEngine
+
+interface LocalSpeechPackManager {
+    fun observeState(): Flow<LocalSpeechPackState>
+    suspend fun refresh(languageTag: String)
+    suspend fun install(languageTag: String)
+}
 
 interface QuestionEngine {
     suspend fun selectQuestionsForEpisode(episode: Episode): List<QuestionTemplate>

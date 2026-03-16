@@ -293,6 +293,29 @@ data class CloudCredentials(
         get() = apiKey.isNotBlank()
 }
 
+enum class LocalSpeechPackStatus {
+    UNKNOWN,
+    CHECKING,
+    READY,
+    NOT_INSTALLED,
+    INSTALLING,
+    SCHEDULED,
+    UNSUPPORTED,
+    ERROR,
+}
+
+data class LocalSpeechPackState(
+    val status: LocalSpeechPackStatus = LocalSpeechPackStatus.UNKNOWN,
+    val progressPercent: Int? = null,
+    val message: String? = null,
+) {
+    val isInstalled: Boolean
+        get() = status == LocalSpeechPackStatus.READY
+
+    val isBusy: Boolean
+        get() = status == LocalSpeechPackStatus.CHECKING || status == LocalSpeechPackStatus.INSTALLING
+}
+
 @Serializable
 data class UrgentAction(
     val level: UrgentActionLevel,

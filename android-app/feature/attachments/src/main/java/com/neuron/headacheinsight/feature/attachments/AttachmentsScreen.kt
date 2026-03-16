@@ -16,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.Attachment
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.EmptyState
 import com.neuron.headacheinsight.core.ui.localizedAttachmentType
 import com.neuron.headacheinsight.core.ui.localizedExtractionStatus
 import com.neuron.headacheinsight.core.ui.localizedUploadStatus
@@ -36,15 +38,23 @@ class AttachmentsViewModel @Inject constructor(
 
 @Composable
 fun AttachmentsRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: AttachmentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    AttachmentsScreen(state)
+    AttachmentsScreen(
+        attachments = state,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun AttachmentsScreen(
     attachments: List<Attachment>,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -52,6 +62,14 @@ fun AttachmentsScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (attachments.isEmpty()) {
+            item {
+                EmptyState(
+                    title = stringResource(R.string.attachments_empty_title),
+                    subtitle = stringResource(R.string.attachments_empty_subtitle),
+                )
+            }
+        }
         items(attachments, key = { it.id }) { attachment ->
             HeadacheInsightSectionCard(
                 title = attachment.displayName,
@@ -65,6 +83,12 @@ fun AttachmentsScreen(
                 Text(attachment.localUriOrPath)
                 attachment.extractedText?.let { Text(it.take(240)) }
             }
+        }
+        item {
+            BottomMenuActions(
+                onBack = onBack,
+                onHome = onHome,
+            )
         }
     }
 }

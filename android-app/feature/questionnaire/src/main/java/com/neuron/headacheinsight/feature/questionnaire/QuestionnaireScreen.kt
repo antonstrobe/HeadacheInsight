@@ -22,6 +22,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.QuestionTemplate
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.EmptyState
 import com.neuron.headacheinsight.domain.ObserveQuestionSetUseCase
 import com.neuron.headacheinsight.domain.SaveQuestionAnswerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,16 +59,25 @@ class QuestionnaireViewModel @Inject constructor(
 
 @Composable
 fun QuestionnaireRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: QuestionnaireViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    QuestionnaireScreen(questions = state, onSaveAnswer = viewModel::saveAnswer)
+    QuestionnaireScreen(
+        questions = state,
+        onSaveAnswer = viewModel::saveAnswer,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun QuestionnaireScreen(
     questions: List<QuestionTemplate>,
     onSaveAnswer: (String, String) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     val answers = remember { mutableStateMapOf<String, String>() }
     LazyColumn(
@@ -75,6 +86,14 @@ fun QuestionnaireScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (questions.isEmpty()) {
+            item {
+                EmptyState(
+                    title = stringResource(R.string.questionnaire_empty_title),
+                    subtitle = stringResource(R.string.questionnaire_empty_subtitle),
+                )
+            }
+        }
         items(questions, key = { it.id }) { question ->
             HeadacheInsightSectionCard(
                 title = question.shortLabel,
@@ -90,6 +109,12 @@ fun QuestionnaireScreen(
                     Text(stringResource(R.string.questionnaire_save))
                 }
             }
+        }
+        item {
+            BottomMenuActions(
+                onBack = onBack,
+                onHome = onHome,
+            )
         }
     }
 }

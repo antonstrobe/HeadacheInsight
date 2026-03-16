@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.UserProfile
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.domain.ProfileRepository
 import com.neuron.headacheinsight.domain.UpsertProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,12 +56,16 @@ class ProfileViewModel @Inject constructor(
 
 @Composable
 fun ProfileRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     ProfileScreen(
         profile = profile,
         onSave = { displayName, cityRegion, cloud -> viewModel.save(profile, displayName, cityRegion, cloud) },
+        onBack = onBack,
+        onHome = onHome,
     )
 }
 
@@ -68,6 +73,8 @@ fun ProfileRoute(
 fun ProfileScreen(
     profile: UserProfile?,
     onSave: (String, String, Boolean) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     var displayName by remember(profile?.displayName) { mutableStateOf(profile?.displayName.orEmpty()) }
     var cityRegion by remember(profile?.cityRegion) { mutableStateOf(profile?.cityRegion.orEmpty()) }
@@ -102,5 +109,9 @@ fun ProfileScreen(
         ) {
             Text(stringResource(R.string.profile_save))
         }
+        BottomMenuActions(
+            onBack = onBack,
+            onHome = onHome,
+        )
     }
 }

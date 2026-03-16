@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,8 +16,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.InsightSummary
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.EpisodeTimelineList
 import com.neuron.headacheinsight.core.ui.localizedTriggerLabel
+import com.neuron.headacheinsight.domain.EpisodeRepository
 import com.neuron.headacheinsight.domain.InsightRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,27 +32,46 @@ import javax.inject.Inject
 @HiltViewModel
 class InsightsViewModel @Inject constructor(
     insightRepository: InsightRepository,
+    episodeRepository: EpisodeRepository,
 ) : androidx.lifecycle.ViewModel() {
     val state: StateFlow<InsightSummary> = insightRepository.observeInsightSummary()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightSummary(0, 0.0, 0, 0, emptyList()))
+
+    val episodes: StateFlow<List<Episode>> = episodeRepository.observeEpisodes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
 
 @Composable
 fun InsightsRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onOpenEpisode: (String) -> Unit,
     viewModel: InsightsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    InsightsScreen(state)
+    val episodes by viewModel.episodes.collectAsStateWithLifecycle()
+    InsightsScreen(
+        summary = state,
+        episodes = episodes,
+        onOpenEpisode = onOpenEpisode,
+        onBack = onBack,
+        onHome = onHome,
+    )
 }
 
 @Composable
 fun InsightsScreen(
     summary: InsightSummary,
+    episodes: List<Episode>,
+    onOpenEpisode: (String) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
 ) {
     val triggerLabels = summary.suspectedTriggers.map { localizedTriggerLabel(it) }
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -65,5 +90,18 @@ fun InsightsScreen(
         HeadacheInsightSectionCard(title = stringResource(R.string.insights_triggers_title)) {
             Text(triggerLabels.joinToString())
         }
+        HeadacheInsightSectionCard(
+            title = stringResource(R.string.insights_history_title),
+            supportingText = stringResource(R.string.insights_history_subtitle),
+        ) {
+            EpisodeTimelineList(
+                episodes = episodes,
+                onOpenEpisode = onOpenEpisode,
+            )
+        }
+        BottomMenuActions(
+            onBack = onBack,
+            onHome = onHome,
+        )
     }
 }

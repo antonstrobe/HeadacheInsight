@@ -29,3 +29,4 @@ android-app/app/schemas/
 *.apk
 *.aab
 *.log
+*.db

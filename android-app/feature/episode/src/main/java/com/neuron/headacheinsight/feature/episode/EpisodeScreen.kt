@@ -3,8 +3,10 @@ package com.neuron.headacheinsight.feature.episode
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.KeyValueLine
 import com.neuron.headacheinsight.core.model.EpisodeDetail
+import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.localizedAttachmentType
 import com.neuron.headacheinsight.core.ui.localizedRedFlagStatus
 import com.neuron.headacheinsight.core.ui.localizedSymptomLabel
@@ -41,15 +44,26 @@ class EpisodeViewModel @Inject constructor(
 
 @Composable
 fun EpisodeRoute(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onOpenQuestions: (String) -> Unit,
     viewModel: EpisodeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    EpisodeScreen(state = state)
+    EpisodeScreen(
+        state = state,
+        onBack = onBack,
+        onHome = onHome,
+        onOpenQuestions = onOpenQuestions,
+    )
 }
 
 @Composable
 fun EpisodeScreen(
     state: EpisodeDetail?,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onOpenQuestions: (String) -> Unit,
 ) {
     if (state == null) {
         Column(
@@ -136,6 +150,20 @@ fun EpisodeScreen(
                     Text(stringResource(R.string.episode_analysis_line, analysis.modelName, analysis.status.name))
                 }
             }
+        }
+        item {
+            Button(
+                onClick = { onOpenQuestions(state.episode.id) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.episode_open_questions))
+            }
+        }
+        item {
+            BottomMenuActions(
+                onBack = onBack,
+                onHome = onHome,
+            )
         }
     }
 }

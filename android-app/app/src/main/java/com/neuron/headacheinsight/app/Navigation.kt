@@ -84,6 +84,13 @@ fun HeadacheInsightNavHost(
         (context as? Activity)?.finish()
     }
 
+    fun navigateHome() {
+        navController.navigate(HeadacheInsightDestination.Home.route) {
+            popUpTo(HeadacheInsightDestination.Home.route) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = resolveStartRoute(),
@@ -125,7 +132,7 @@ fun HeadacheInsightNavHost(
                 onProfile = { navController.navigate(HeadacheInsightDestination.Profile.route) },
                 onAttachments = { navController.navigate(HeadacheInsightDestination.Attachments.route) },
                 onReports = { navController.navigate(HeadacheInsightDestination.Reports.route) },
-                onQuestions = { navController.navigate(HeadacheInsightDestination.QuickLog.route) },
+                onQuestions = { navController.navigate(HeadacheInsightDestination.Questionnaire.create(it)) },
                 onSettings = { navController.navigate(HeadacheInsightDestination.Settings.route) },
                 onSync = { navController.navigate(HeadacheInsightDestination.Sync.route) },
             )
@@ -133,26 +140,65 @@ fun HeadacheInsightNavHost(
         composable(HeadacheInsightDestination.QuickLog.route) {
             QuickLogRoute(
                 onOpenEpisode = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
-                onRequestVoiceRecording = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
             )
         }
         composable(
             route = HeadacheInsightDestination.Episode.route,
             arguments = listOf(navArgument("episodeId") { type = NavType.StringType }),
         ) {
-            EpisodeRoute()
+            EpisodeRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+                onOpenQuestions = { navController.navigate(HeadacheInsightDestination.Questionnaire.create(it)) },
+            )
         }
         composable(
             route = HeadacheInsightDestination.Questionnaire.route,
             arguments = listOf(navArgument("episodeId") { type = NavType.StringType }),
         ) {
-            QuestionnaireRoute()
+            QuestionnaireRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
         }
-        composable(HeadacheInsightDestination.Profile.route) { ProfileRoute() }
-        composable(HeadacheInsightDestination.Attachments.route) { AttachmentsRoute() }
-        composable(HeadacheInsightDestination.Insights.route) { InsightsRoute() }
-        composable(HeadacheInsightDestination.Reports.route) { ReportsRoute() }
-        composable(HeadacheInsightDestination.Settings.route) { SettingsRoute() }
-        composable(HeadacheInsightDestination.Sync.route) { SyncRoute() }
+        composable(HeadacheInsightDestination.Profile.route) {
+            ProfileRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
+        }
+        composable(HeadacheInsightDestination.Attachments.route) {
+            AttachmentsRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
+        }
+        composable(HeadacheInsightDestination.Insights.route) {
+            InsightsRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+                onOpenEpisode = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
+            )
+        }
+        composable(HeadacheInsightDestination.Reports.route) {
+            ReportsRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
+        }
+        composable(HeadacheInsightDestination.Settings.route) {
+            SettingsRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
+        }
+        composable(HeadacheInsightDestination.Sync.route) {
+            SyncRoute(
+                onBack = { navController.popBackStack() },
+                onHome = ::navigateHome,
+            )
+        }
     }
 }

@@ -42,4 +42,6 @@
     <string name="sync_op_generate_questions">Генерация уточняющих вопросов</string>
     <string name="sync_op_analyze_attachment">Анализ вложения</string>
     <string name="sync_op_upload_attachment">Загрузка вложения</string>
+    <string name="navigation_back">Назад</string>
+    <string name="navigation_home">В меню</string>
 </resources>

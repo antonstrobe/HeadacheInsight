@@ -2,7 +2,7 @@
     <string name="quicklog_title">Быстрый режим</string>
     <string name="quicklog_subtitle">Сохраните частичную запись сейчас и вернитесь к деталям позже.</string>
     <string name="quicklog_episode_id">Эпизод: %1$s</string>
-    <string name="quicklog_episode_creating">создаётся…</string>
+    <string name="quicklog_episode_creating">создаётся...</string>
     <string name="quicklog_symptoms_title">Симптомы</string>
     <string name="quicklog_red_flags_title">Сначала тревожные признаки</string>
     <string name="quicklog_red_flag_sudden">Внезапная / самая сильная боль</string>
@@ -11,8 +11,14 @@
     <string name="quicklog_red_flag_weakness">Слабость с одной стороны</string>
     <string name="quicklog_medication_title">Лекарства</string>
     <string name="quicklog_medication_label">Что уже приняли?</string>
-    <string name="quicklog_voice_start">Начать голосовую заметку</string>
-    <string name="quicklog_voice_stop">Остановить голосовую заметку</string>
+    <string name="quicklog_dictation_start">Начать офлайн-диктовку</string>
+    <string name="quicklog_dictation_prompt">Опишите, что вы чувствуете</string>
+    <string name="quicklog_dictation_saved">Диктовка сохранена: %1$s</string>
+    <string name="quicklog_dictation_unavailable">Офлайн-диктовка недоступна на этом устройстве.</string>
+    <string name="quicklog_voice_start">Начать аудиозаметку</string>
+    <string name="quicklog_voice_stop">Остановить аудиозаметку</string>
     <string name="quicklog_save_now">Сохранить сейчас</string>
     <string name="quicklog_audio_saved">Аудио сохранено: %1$s</string>
+    <string name="quicklog_audio_permission_required">Для аудиозаметки нужен доступ к микрофону.</string>
+    <string name="quicklog_voice_error">Ошибка голосового ввода: %1$s</string>
 </resources>

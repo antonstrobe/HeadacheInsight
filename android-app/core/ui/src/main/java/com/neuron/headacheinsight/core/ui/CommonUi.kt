@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -70,11 +72,11 @@ fun EpisodeTimelineList(
     modifier: Modifier = Modifier,
     onOpenEpisode: (String) -> Unit,
 ) {
-    LazyColumn(
+    Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(episodes, key = { it.id }) { episode ->
+        episodes.forEach { episode ->
             HeadacheInsightSectionCard(
                 title = episode.startedAt.toString(),
                 supportingText = stringResource(
@@ -102,4 +104,31 @@ fun EmptyState(
     subtitle: String,
 ) {
     HeadacheInsightSectionCard(title = title, supportingText = subtitle) {}
+}
+
+@Composable
+fun BottomMenuActions(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(stringResource(R.string.navigation_back))
+        }
+        Button(
+            onClick = onHome,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(stringResource(R.string.navigation_home))
+        }
+    }
 }

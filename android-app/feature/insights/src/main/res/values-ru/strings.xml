@@ -5,4 +5,6 @@
     <string name="insights_medication_days_title">Дни приёма лекарств</string>
     <string name="insights_functional_impact_title">Функциональное влияние</string>
     <string name="insights_triggers_title">Предполагаемые триггеры</string>
+    <string name="insights_history_title">История эпизодов</string>
+    <string name="insights_history_subtitle">Откройте записанный эпизод, чтобы посмотреть таймлайн, транскрипты и уточняющие детали.</string>
 </resources>

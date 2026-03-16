@@ -20,12 +20,12 @@ import com.neuron.headacheinsight.core.model.RedFlagStatus
 import com.neuron.headacheinsight.core.model.StartConfidence
 import com.neuron.headacheinsight.core.model.TranscriptStatus
 import com.neuron.headacheinsight.core.model.UserProfile
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
-import kotlinx.serialization.json.JsonElement
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.serialization.json.JsonElement
 
 class RedFlagEngine @Inject constructor() {
     fun evaluate(input: LocalRedFlagInput): LocalRedFlagEvaluation {
@@ -56,7 +56,7 @@ class RedFlagEngine @Inject constructor() {
             if (input.fever) add(if (russian) "Высокая температура" else "High fever")
             if (input.stiffNeck) add(if (russian) "Ригидность шеи" else "Stiff neck")
             if (input.visionChange) add(if (russian) "Нарушение зрения" else "Vision changes")
-            if (input.severeVomiting) add(if (russian) "Тяжёлая рвота" else "Severe vomiting")
+            if (input.severeVomiting) add(if (russian) "Тяжелая рвота" else "Severe vomiting")
             if (input.patternWorseThanUsual) add(if (russian) "Резкое ухудшение привычного паттерна" else "Sudden worsening of the usual pattern")
         }
         if (urgentReasons.isNotEmpty()) {
@@ -64,7 +64,7 @@ class RedFlagEngine @Inject constructor() {
                 status = RedFlagStatus.URGENT,
                 reasons = urgentReasons,
                 emergencyMessage = if (russian) {
-                    "Симптомы требуют срочного обсуждения с врачом или неотложной помощи."
+                    "Эти симптомы требуют срочного обсуждения с врачом или обращения за неотложной помощью."
                 } else {
                     "These symptoms need urgent clinician review or emergency care."
                 },
@@ -182,7 +182,7 @@ class EnsureSeedQuestionsUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     suspend operator fun invoke(settings: AppSettings) {
-        val seedVersion = "v1:${settings.languageTag}"
+        val seedVersion = "v2:${settings.languageTag}"
         if (settings.lastSeedVersion == seedVersion) return
         val questions = questionSeedSource.loadSeedQuestions(settings.languageTag)
         questionRepository.replaceSeedQuestions(questions, seedVersion)

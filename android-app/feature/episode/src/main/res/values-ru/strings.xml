@@ -1,5 +1,5 @@
 <resources>
-    <string name="episode_loading">Загрузка эпизода…</string>
+    <string name="episode_loading">Загрузка эпизода...</string>
     <string name="episode_title">Эпизод</string>
     <string name="episode_subtitle">Таймлайн, транскрипты, ответы, вложения и маркеры безопасности</string>
     <string name="episode_started">Начало</string>
@@ -15,4 +15,5 @@
     <string name="episode_attachment_line">%1$s • %2$s</string>
     <string name="episode_answer_line">%1$s: %2$s</string>
     <string name="episode_analysis_line">%1$s • %2$s</string>
+    <string name="episode_open_questions">Открыть вопросы</string>
 </resources>

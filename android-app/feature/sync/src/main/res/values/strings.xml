@@ -1,3 +1,5 @@
 <resources>
     <string name="sync_supporting">%1$s • retries %2$d</string>
+    <string name="sync_empty_title">Sync queue is empty</string>
+    <string name="sync_empty_subtitle">Pending uploads, transcriptions, and cloud analysis jobs will appear here.</string>
 </resources>

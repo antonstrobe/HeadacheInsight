@@ -1,5 +1,5 @@
 <resources>
-    <string name="episode_loading">Loading episode…</string>
+    <string name="episode_loading">Loading episode...</string>
     <string name="episode_title">Episode</string>
     <string name="episode_subtitle">Timeline, transcript, answers, attachments, and safety markers</string>
     <string name="episode_started">Started</string>
@@ -15,4 +15,5 @@
     <string name="episode_attachment_line">%1$s • %2$s</string>
     <string name="episode_answer_line">%1$s: %2$s</string>
     <string name="episode_analysis_line">%1$s • %2$s</string>
+    <string name="episode_open_questions">Open questions</string>
 </resources>

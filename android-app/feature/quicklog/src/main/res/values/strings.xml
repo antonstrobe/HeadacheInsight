@@ -2,7 +2,7 @@
     <string name="quicklog_title">Acute Quick Mode</string>
     <string name="quicklog_subtitle">Save a partial entry now and return later.</string>
     <string name="quicklog_episode_id">Episode ID: %1$s</string>
-    <string name="quicklog_episode_creating">creating…</string>
+    <string name="quicklog_episode_creating">creating...</string>
     <string name="quicklog_symptoms_title">Symptoms</string>
     <string name="quicklog_red_flags_title">Red flags first</string>
     <string name="quicklog_red_flag_sudden">Sudden / worst pain</string>
@@ -11,8 +11,14 @@
     <string name="quicklog_red_flag_weakness">One-sided weakness</string>
     <string name="quicklog_medication_title">Medication notes</string>
     <string name="quicklog_medication_label">What have you taken?</string>
-    <string name="quicklog_voice_start">Start voice note</string>
-    <string name="quicklog_voice_stop">Stop voice note</string>
+    <string name="quicklog_dictation_start">Start offline dictation</string>
+    <string name="quicklog_dictation_prompt">Describe what you feel</string>
+    <string name="quicklog_dictation_saved">Dictation saved: %1$s</string>
+    <string name="quicklog_dictation_unavailable">Offline dictation is unavailable on this device.</string>
+    <string name="quicklog_voice_start">Start audio note</string>
+    <string name="quicklog_voice_stop">Stop audio note</string>
     <string name="quicklog_save_now">Save now</string>
     <string name="quicklog_audio_saved">Audio saved: %1$s</string>
+    <string name="quicklog_audio_permission_required">Microphone permission is required for an audio note.</string>
+    <string name="quicklog_voice_error">Voice input error: %1$s</string>
 </resources>

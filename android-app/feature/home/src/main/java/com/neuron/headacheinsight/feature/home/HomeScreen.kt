@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -57,7 +58,7 @@ fun HomeRoute(
     onProfile: () -> Unit,
     onAttachments: () -> Unit,
     onReports: () -> Unit,
-    onQuestions: () -> Unit,
+    onQuestions: (String) -> Unit,
     onSettings: () -> Unit,
     onSync: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -86,7 +87,7 @@ fun HomeScreen(
     onProfile: () -> Unit,
     onAttachments: () -> Unit,
     onReports: () -> Unit,
-    onQuestions: () -> Unit,
+    onQuestions: (String) -> Unit,
     onSettings: () -> Unit,
     onSync: () -> Unit,
 ) {
@@ -98,8 +99,8 @@ fun HomeScreen(
         add(
             HomeActionItem(
                 label = stringResource(R.string.home_new_questions),
-                onClick = onQuestions,
-                enabled = state.cloudEnabled,
+                onClick = { state.pendingEpisode?.id?.let(onQuestions) },
+                enabled = state.cloudEnabled && state.pendingEpisode != null,
             ),
         )
         add(HomeActionItem(label = stringResource(R.string.home_settings), onClick = onSettings))
@@ -156,7 +157,13 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             state.pendingEpisode?.let { pending ->
                 Button(
                     onClick = { onContinueEpisode(pending.id) },

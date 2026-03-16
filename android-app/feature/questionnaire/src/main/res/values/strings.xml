@@ -1,4 +1,6 @@
 <resources>
     <string name="questionnaire_answer_label">Answer</string>
     <string name="questionnaire_save">Save</string>
+    <string name="questionnaire_empty_title">No questions yet</string>
+    <string name="questionnaire_empty_subtitle">Generate follow-up questions after you have an active episode with some data.</string>
 </resources>

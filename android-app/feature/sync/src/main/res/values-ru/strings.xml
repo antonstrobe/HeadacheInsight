@@ -1,3 +1,5 @@
 <resources>
     <string name="sync_supporting">%1$s • попыток %2$d</string>
+    <string name="sync_empty_title">Очередь синхронизации пуста</string>
+    <string name="sync_empty_subtitle">Здесь будут показываться ожидающие загрузки, транскрибации и облачные задачи анализа.</string>
 </resources>
