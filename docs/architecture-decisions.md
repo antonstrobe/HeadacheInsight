@@ -12,11 +12,11 @@
 - Decision: use Room as the primary source of truth for structured data and DataStore only for typed preferences/consents.
 - Rationale: deterministic offline behavior, explicit migrations, strong testing support.
 
-## ADR-003: Backend-only OpenAI access
+## ADR-003: Backend-routed OpenAI access with user-managed app keys
 
 - Status: accepted
-- Decision: all OpenAI calls route through a FastAPI backend; Android stores no API key.
-- Rationale: protects secrets, centralizes schema validation and logging/redaction, supports future rate limiting.
+- Decision: all OpenAI calls still route through a FastAPI backend, but the Android app may securely store a user-provided OpenAI key in Keystore-backed isolated storage and forward it to the backend per request.
+- Rationale: preserves the backend proxy boundary, keeps schema validation and redaction centralized, and supports the product requirement that end users can manage their own key directly inside the app without forcing backend-side secret storage.
 
 ## ADR-004: Local ASR engine choice
 
@@ -45,7 +45,7 @@
 ## ADR-008: Storage encryption posture
 
 - Status: accepted
-- Decision: use Android Keystore for signing keys and encrypted attachment files; keep Room sandboxed but unencrypted in MVP.
+- Decision: use Android Keystore for signing keys, user-managed API keys, and encrypted attachment files; keep Room sandboxed but unencrypted in MVP.
 - Rationale: delivers strong protection for secrets and attachments now, while keeping Room migration complexity lower until a stronger threat model requires SQLCipher.
 
 ## ADR-009: Language selection and Russian-first startup

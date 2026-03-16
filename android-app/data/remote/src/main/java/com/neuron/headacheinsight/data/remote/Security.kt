@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.neuron.headacheinsight.domain.ClientIdentityProvider
+import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.Binds
 import dagger.Module
@@ -85,12 +86,18 @@ class KeystoreClientIdentityProvider @Inject constructor(
 @Singleton
 class SignedHeadersInterceptor @Inject constructor(
     private val identityProvider: ClientIdentityProvider,
+    private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val settingsRepository: SettingsRepository,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
         val request = chain.request()
         val currentSettings = runBlocking { settingsRepository.observeSettings().first() }
-        val targetBaseUrl = currentSettings.backendBaseUrl.toHttpUrl()
+        val cloudCredentials = runBlocking { cloudCredentialsRepository.observeCredentials().first() }
+        val targetBaseUrl = runCatching {
+            currentSettings.backendBaseUrl.toHttpUrl()
+        }.getOrElse {
+            DEFAULT_BACKEND_URL.toHttpUrl()
+        }
 
         val rewritten = request.url.newBuilder()
             .scheme(targetBaseUrl.scheme)
@@ -116,11 +123,21 @@ class SignedHeadersInterceptor @Inject constructor(
             .header("X-Nonce", nonce)
             .header("X-Body-SHA256", bodyHashBase64)
             .header("X-Signature", signature)
+            .apply {
+                if (cloudCredentials.apiKey.isNotBlank()) {
+                    header("X-OpenAI-Api-Key", cloudCredentials.apiKey)
+                }
+                header("X-OpenAI-Analysis-Model", cloudCredentials.analysisModel)
+                header("X-OpenAI-Question-Model", cloudCredentials.questionModel)
+                header("X-OpenAI-Transcribe-Model", cloudCredentials.transcribeModel)
+            }
             .build()
 
         return chain.proceed(signedRequest)
     }
 }
+
+private const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8000/"
 
 @Module
 @InstallIn(SingletonComponent::class)

@@ -23,7 +23,7 @@ from app.models.contracts import (
     TranscribeResponse,
 )
 from app.models.store import AuditLog, InstallClient
-from app.services.openai_service import OpenAIService
+from app.services.openai_service import OpenAIRequestOverrides, OpenAIService
 from app.services.security import verify_signed_request
 
 configure_logging(settings.log_level)
@@ -84,12 +84,25 @@ def require_signature(request: Request, body: bytes) -> str:
         raise
 
 
+def request_openai_overrides(request: Request) -> OpenAIRequestOverrides:
+    def read(name: str) -> str | None:
+        value = request.headers.get(name)
+        return value.strip() if value and value.strip() else None
+
+    return OpenAIRequestOverrides(
+        api_key=read("X-OpenAI-Api-Key"),
+        analysis_model=read("X-OpenAI-Analysis-Model"),
+        question_model=read("X-OpenAI-Question-Model"),
+        transcribe_model=read("X-OpenAI-Transcribe-Model"),
+    )
+
+
 @app.post("/api/analyze-episode")
 async def analyze_episode(request: Request) -> JSONResponse:
     body = await request.body()
     install_id = require_signature(request, body)
     payload = AnalyzeEpisodeRequest.model_validate_json(body)
-    response = service.analyze_episode(payload.model_dump())
+    response = service.analyze_episode(payload.model_dump(), overrides=request_openai_overrides(request))
     record_audit(request.state.trace_id, request.url.path, request.method, True, "analysis-complete", install_id)
     structured_log(logger, "analysis_complete", trace_id=request.state.trace_id, install_id=install_id, owner_id=payload.owner_id)
     return JSONResponse(response)
@@ -100,7 +113,7 @@ async def generate_follow_up_questions(request: Request) -> GenerateFollowUpQues
     body = await request.body()
     install_id = require_signature(request, body)
     payload = GenerateFollowUpQuestionsRequest.model_validate_json(body)
-    response = service.generate_follow_up_questions(payload.model_dump())
+    response = service.generate_follow_up_questions(payload.model_dump(), overrides=request_openai_overrides(request))
     record_audit(request.state.trace_id, request.url.path, request.method, True, "questions-generated", install_id)
     return GenerateFollowUpQuestionsResponse.model_validate(response)
 
@@ -110,7 +123,7 @@ async def analyze_attachments(request: Request) -> AnalyzeAttachmentsResponse:
     body = await request.body()
     install_id = require_signature(request, body)
     payload = AnalyzeAttachmentsRequest.model_validate_json(body)
-    response = service.analyze_attachments(payload.model_dump())
+    response = service.analyze_attachments(payload.model_dump(), overrides=request_openai_overrides(request))
     record_audit(request.state.trace_id, request.url.path, request.method, True, "attachments-analyzed", install_id)
     return AnalyzeAttachmentsResponse.model_validate(response)
 
@@ -131,7 +144,7 @@ async def transcribe(
             raise
     parsed_metadata = TranscribeMetadata.model_validate_json(metadata)
     content = await file.read()
-    transcript = service.transcribe(file.filename or "audio.wav", content)
+    transcript = service.transcribe(file.filename or "audio.wav", content, overrides=request_openai_overrides(request))
     record_audit(request.state.trace_id, request.url.path, request.method, True, "transcription-complete", install_id)
     return TranscribeResponse(
         episode_id=parsed_metadata.episode_id,

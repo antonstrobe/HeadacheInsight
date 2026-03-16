@@ -283,6 +283,16 @@ data class AppSettings(
     val lastSeedVersion: String? = null,
 )
 
+data class CloudCredentials(
+    val apiKey: String = "",
+    val analysisModel: String = "gpt-4.1",
+    val questionModel: String = "gpt-4.1-mini",
+    val transcribeModel: String = "gpt-4o-transcribe",
+) {
+    val hasApiKey: Boolean
+        get() = apiKey.isNotBlank()
+}
+
 @Serializable
 data class UrgentAction(
     val level: UrgentActionLevel,

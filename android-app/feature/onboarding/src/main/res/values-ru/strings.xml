@@ -6,7 +6,7 @@
     <string name="onboarding_name_label">Имя или удобное обращение</string>
     <string name="onboarding_city_label">Город / регион (примерно)</string>
     <string name="onboarding_cloud_title">Включить облачный анализ</string>
-    <string name="onboarding_cloud_subtitle">Структурированный анализ через ваш сервер. Приложение остаётся полезным и без него.</string>
+    <string name="onboarding_cloud_subtitle">Необязательный структурированный анализ через ваш сервер. Ключ OpenAI / ChatGPT API можно добавить позже в настройках.</string>
     <string name="onboarding_location_title">Разрешить приблизительную геолокацию</string>
     <string name="onboarding_location_subtitle">Сохраняем только снимки города или региона, когда это уместно.</string>
     <string name="onboarding_attachment_title">Разрешить загрузку вложений</string>

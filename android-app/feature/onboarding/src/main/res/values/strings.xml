@@ -6,7 +6,7 @@
     <string name="onboarding_name_label">Name or nickname</string>
     <string name="onboarding_city_label">City / region (coarse)</string>
     <string name="onboarding_cloud_title">Enable cloud analysis</string>
-    <string name="onboarding_cloud_subtitle">Optional structured analysis through your backend. The app is still useful without it.</string>
+    <string name="onboarding_cloud_subtitle">Optional structured analysis through your server. You can add your OpenAI / ChatGPT API key later in Settings.</string>
     <string name="onboarding_location_title">Allow coarse location</string>
     <string name="onboarding_location_subtitle">Store only city or region snapshots when they matter.</string>
     <string name="onboarding_attachment_title">Allow attachment uploads</string>

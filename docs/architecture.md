@@ -36,7 +36,8 @@ The backend is a thin FastAPI proxy with:
 
 ### Cloud Boundaries
 
-- Android never holds the OpenAI API key.
-- Android only calls the project backend over HTTPS.
+- Android can store a user-provided OpenAI API key locally in Keystore-backed isolated storage.
+- Android only calls the project backend over HTTPS and never calls OpenAI directly.
+- The backend can use a key forwarded by the app per request, or fall back to environment-based credentials for server deployments.
 - All LLM outputs are schema-driven JSON or bounded transcription results.
 - Chain-of-thought is neither requested nor stored.

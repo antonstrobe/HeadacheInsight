@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import time
+import uuid
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -41,11 +42,11 @@ def test_register_and_signed_analysis(monkeypatch) -> None:
     sample_payload = json.loads((Path(__file__).parent / "fixtures" / "sample_episode_request.json").read_text(encoding="utf-8"))
     private_key = Ed25519PrivateKey.generate()
     public_key_b64 = base64.b64encode(private_key.public_key().public_bytes_raw()).decode()
-    install_id = "install-test-1"
+    install_id = f"install-test-{uuid.uuid4()}"
     client = TestClient(app)
     register_client(client, install_id, public_key_b64)
 
-    monkeypatch.setattr(service, "analyze_episode", lambda payload: {
+    monkeypatch.setattr(service, "analyze_episode", lambda payload, overrides=None: {
         "schema_version": "v1",
         "analysis_id": "analysis-1",
         "owner_type": "EPISODE",
@@ -74,7 +75,7 @@ def test_register_and_signed_analysis(monkeypatch) -> None:
 
     body = json.dumps(sample_payload).encode()
     timestamp = str(int(time.time() * 1000))
-    nonce = "nonce-1"
+    nonce = f"nonce-{uuid.uuid4()}"
     body_hash, signature = sign_request(private_key, "POST", "/api/analyze-episode", body, timestamp, nonce)
     response = client.post(
         "/api/analyze-episode",

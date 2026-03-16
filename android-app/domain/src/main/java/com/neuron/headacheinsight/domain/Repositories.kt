@@ -5,6 +5,7 @@ import com.neuron.headacheinsight.core.model.AnalysisSnapshot
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.Attachment
 import com.neuron.headacheinsight.core.model.BaselineQuestionAnswer
+import com.neuron.headacheinsight.core.model.CloudCredentials
 import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.EpisodeContext
 import com.neuron.headacheinsight.core.model.EpisodeDetail
@@ -35,6 +36,11 @@ interface ProfileRepository {
 interface SettingsRepository {
     fun observeSettings(): Flow<AppSettings>
     suspend fun updateSettings(transform: (AppSettings) -> AppSettings)
+}
+
+interface CloudCredentialsRepository {
+    fun observeCredentials(): Flow<CloudCredentials>
+    suspend fun saveCredentials(credentials: CloudCredentials)
 }
 
 interface EpisodeRepository {
