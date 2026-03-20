@@ -14,6 +14,7 @@
     <string name="quicklog_medication_title">Medication notes</string>
     <string name="quicklog_medication_label">What have you taken?</string>
     <string name="quicklog_dictation_start">Start offline dictation</string>
+    <string name="quicklog_dictation_stop">Stop offline dictation</string>
     <string name="quicklog_dictation_prompt">Describe what you feel</string>
     <string name="quicklog_dictation_saved">Dictation saved: %1$s</string>
     <string name="quicklog_dictation_unavailable">Offline dictation is unavailable on this device.</string>
@@ -21,6 +22,6 @@
     <string name="quicklog_voice_stop">Stop audio note</string>
     <string name="quicklog_save_now">Save now</string>
     <string name="quicklog_audio_saved">Audio saved: %1$s</string>
-    <string name="quicklog_audio_permission_required">Microphone permission is required for an audio note.</string>
+    <string name="quicklog_audio_permission_required">Microphone permission is required for voice input.</string>
     <string name="quicklog_voice_error">Voice input error: %1$s</string>
 </resources>

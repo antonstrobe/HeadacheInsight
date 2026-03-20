@@ -29,6 +29,7 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.EmptyState
+import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.ObserveQuestionSetUseCase
 import com.neuron.headacheinsight.domain.SaveQuestionAnswerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -138,8 +139,10 @@ fun QuestionnaireScreen(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(question.helpText ?: stringResource(R.string.questionnaire_answer_label)) },
                     )
-                    Button(onClick = { onSaveAnswer(question.id, answers[question.id].orEmpty()) }) {
-                        Text(stringResource(R.string.questionnaire_save))
+                    SectionActionRow {
+                        Button(onClick = { onSaveAnswer(question.id, answers[question.id].orEmpty()) }) {
+                            Text(stringResource(R.string.questionnaire_save))
+                        }
                     }
                 }
             }

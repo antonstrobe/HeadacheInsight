@@ -14,6 +14,7 @@
     <string name="quicklog_medication_title">Лекарства</string>
     <string name="quicklog_medication_label">Что уже приняли?</string>
     <string name="quicklog_dictation_start">Начать офлайн-диктовку</string>
+    <string name="quicklog_dictation_stop">Остановить офлайн-диктовку</string>
     <string name="quicklog_dictation_prompt">Опишите, что вы чувствуете</string>
     <string name="quicklog_dictation_saved">Диктовка сохранена: %1$s</string>
     <string name="quicklog_dictation_unavailable">Офлайн-диктовка недоступна на этом устройстве.</string>
@@ -21,6 +22,6 @@
     <string name="quicklog_voice_stop">Остановить аудиозаметку</string>
     <string name="quicklog_save_now">Сохранить сейчас</string>
     <string name="quicklog_audio_saved">Аудио сохранено: %1$s</string>
-    <string name="quicklog_audio_permission_required">Для аудиозаметки нужен доступ к микрофону.</string>
+    <string name="quicklog_audio_permission_required">Для голосового ввода нужен доступ к микрофону.</string>
     <string name="quicklog_voice_error">Ошибка голосового ввода: %1$s</string>
 </resources>

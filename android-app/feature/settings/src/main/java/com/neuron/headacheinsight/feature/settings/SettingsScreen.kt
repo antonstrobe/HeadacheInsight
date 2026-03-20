@@ -11,7 +11,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +31,8 @@ import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.CloudCredentials
 import com.neuron.headacheinsight.core.model.LocalSpeechPackState
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.SectionActionRow
+import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import com.neuron.headacheinsight.domain.LocalSpeechPackManager
 import com.neuron.headacheinsight.domain.SettingsRepository
@@ -163,12 +164,12 @@ fun SettingsScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        HeadacheInsightSectionCard(
+        ToggleSectionCard(
             title = stringResource(R.string.settings_cloud_title),
+            checked = cloudState,
+            onCheckedChange = { cloudState = it },
             supportingText = stringResource(R.string.settings_cloud_subtitle),
-        ) {
-            Switch(checked = cloudState, onCheckedChange = { cloudState = it })
-        }
+        )
 
         HeadacheInsightSectionCard(
             title = stringResource(R.string.settings_backend_title),
@@ -200,14 +201,16 @@ fun SettingsScreen(
                     PasswordVisualTransformation()
                 },
             )
-            TextButton(onClick = { showApiKey = !showApiKey }) {
-                Text(
-                    if (showApiKey) {
-                        stringResource(R.string.settings_key_hide)
-                    } else {
-                        stringResource(R.string.settings_key_show)
-                    },
-                )
+            SectionActionRow {
+                TextButton(onClick = { showApiKey = !showApiKey }) {
+                    Text(
+                        if (showApiKey) {
+                            stringResource(R.string.settings_key_hide)
+                        } else {
+                            stringResource(R.string.settings_key_show)
+                        },
+                    )
+                }
             }
         }
 

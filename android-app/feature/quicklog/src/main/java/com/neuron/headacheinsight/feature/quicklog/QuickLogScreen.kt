@@ -1,10 +1,13 @@
 package com.neuron.headacheinsight.feature.quicklog
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +26,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,6 +51,7 @@ import com.neuron.headacheinsight.core.model.TranscriptStatus
 import com.neuron.headacheinsight.core.model.TranscriptVariant
 import com.neuron.headacheinsight.core.ui.SelectableChipGroup
 import com.neuron.headacheinsight.core.ui.SeveritySlider
+import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.AudioRecorder
 import com.neuron.headacheinsight.domain.CreateEpisodeUseCase
 import com.neuron.headacheinsight.domain.EpisodeRepository
@@ -65,6 +68,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+
+private enum class PendingMicrophoneAction {
+    RECORDING,
+    DICTATION,
+}
 
 data class QuickLogUiState(
     val episode: Episode? = null,
@@ -274,53 +282,129 @@ fun QuickLogScreen(
     val context = LocalContext.current
     val localeTag = context.resources.configuration.locales[0]?.toLanguageTag() ?: "ru-RU"
     var permissionDenied by remember { mutableStateOf(false) }
+    var isDictating by remember { mutableStateOf(false) }
+    var pendingMicrophoneAction by remember { mutableStateOf<PendingMicrophoneAction?>(null) }
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+
+    fun disposeSpeechRecognizer() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        isDictating = false
+    }
+
+    androidx.compose.runtime.DisposableEffect(context) {
+        onDispose {
+            disposeSpeechRecognizer()
+        }
+    }
+
+    fun startOfflineDictation() {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+            return
+        }
+        disposeSpeechRecognizer()
+        val recognizer = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } else {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }
+        }.getOrElse {
+            onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+            return
+        }
+        speechRecognizer = recognizer
+        recognizer.setRecognitionListener(
+            object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) = Unit
+
+                override fun onBeginningOfSpeech() = Unit
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+                override fun onEndOfSpeech() = Unit
+
+                override fun onError(error: Int) {
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                            context.getString(R.string.quicklog_audio_permission_required)
+                        else -> context.getString(R.string.quicklog_dictation_unavailable)
+                    }
+                    disposeSpeechRecognizer()
+                    onVoiceError(message)
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val transcript = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+                    disposeSpeechRecognizer()
+                    when {
+                        transcript.isNotBlank() -> onSaveOfflineDictation(transcript)
+                        else -> onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            },
+        )
+        onVoiceError(null)
+        isDictating = true
+        recognizer.startListening(buildOfflineDictationIntent(context, localeTag))
+    }
+
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         permissionDenied = !granted
+        val pendingAction = pendingMicrophoneAction
+        pendingMicrophoneAction = null
         if (granted) {
-            onToggleVoiceRecording()
-        }
-    }
-    val dictationLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val transcript = result.data
-            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            ?.trim()
-            .orEmpty()
-        when {
-            result.resultCode == Activity.RESULT_OK && transcript.isNotBlank() -> onSaveOfflineDictation(transcript)
-            result.resultCode == Activity.RESULT_CANCELED -> onVoiceError(null)
-            else -> onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+            when (pendingAction) {
+                PendingMicrophoneAction.RECORDING -> onToggleVoiceRecording()
+                PendingMicrophoneAction.DICTATION -> startOfflineDictation()
+                null -> Unit
+            }
         }
     }
 
-    fun handleVoiceButton() {
-        if (state.isRecording || ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+    fun ensureMicrophonePermission(
+        action: PendingMicrophoneAction,
+        onGranted: () -> Unit,
+    ) {
+        val hasPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
             permissionDenied = false
-            onToggleVoiceRecording()
+            pendingMicrophoneAction = null
+            onGranted()
         } else {
+            pendingMicrophoneAction = action
             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
+    fun handleVoiceButton() {
+        if (state.isRecording) {
+            onToggleVoiceRecording()
+        } else {
+            ensureMicrophonePermission(PendingMicrophoneAction.RECORDING, onToggleVoiceRecording)
+        }
+    }
+
     fun handleOfflineDictation() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, localeTag)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.quicklog_dictation_prompt))
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        if (isDictating) {
+            speechRecognizer?.stopListening()
+        } else {
+            ensureMicrophonePermission(PendingMicrophoneAction.DICTATION, ::startOfflineDictation)
         }
-        if (intent.resolveActivity(context.packageManager) == null) {
-            onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
-            return
-        }
-        onVoiceError(null)
-        dictationLauncher.launch(intent)
     }
 
     Scaffold(
@@ -405,7 +489,13 @@ fun QuickLogScreen(
                     minLines = 3,
                 )
                 OutlinedButton(onClick = ::handleOfflineDictation, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.quicklog_dictation_start))
+                    Text(
+                        if (isDictating) {
+                            stringResource(R.string.quicklog_dictation_stop)
+                        } else {
+                            stringResource(R.string.quicklog_dictation_start)
+                        },
+                    )
                 }
                 Button(onClick = ::handleVoiceButton, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -453,7 +543,22 @@ private fun RedFlagToggle(
     value: Boolean,
     onValueChange: (Boolean) -> Unit,
 ) {
-    HeadacheInsightSectionCard(title = title) {
-        Switch(checked = value, onCheckedChange = onValueChange)
-    }
+    ToggleSectionCard(
+        title = title,
+        checked = value,
+        onCheckedChange = onValueChange,
+    )
+}
+
+private fun buildOfflineDictationIntent(
+    context: android.content.Context,
+    localeTag: String,
+): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, localeTag)
+    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+    putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.quicklog_dictation_prompt))
+    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
 }

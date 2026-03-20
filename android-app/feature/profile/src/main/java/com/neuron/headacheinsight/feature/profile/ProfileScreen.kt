@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.UserProfile
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
+import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.ProfileRepository
 import com.neuron.headacheinsight.domain.UpsertProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -100,9 +100,11 @@ fun ProfileScreen(
                 label = { Text(stringResource(R.string.profile_city_region)) },
             )
         }
-        HeadacheInsightSectionCard(title = stringResource(R.string.profile_cloud_title)) {
-            Switch(checked = cloud, onCheckedChange = { cloud = it })
-        }
+        ToggleSectionCard(
+            title = stringResource(R.string.profile_cloud_title),
+            checked = cloud,
+            onCheckedChange = { cloud = it },
+        )
         Button(
             onClick = { onSave(displayName, cityRegion, cloud) },
             modifier = Modifier.fillMaxWidth(),

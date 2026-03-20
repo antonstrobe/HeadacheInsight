@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.ProfileRepository
 import com.neuron.headacheinsight.domain.UpsertProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -136,23 +136,23 @@ fun OnboardingScreen(
             )
         }
 
-        ToggleCard(
+        ToggleSectionCard(
             title = stringResource(R.string.onboarding_cloud_title),
-            subtitle = stringResource(R.string.onboarding_cloud_subtitle),
             checked = state.cloudEnabled,
             onCheckedChange = onCloudChanged,
+            supportingText = stringResource(R.string.onboarding_cloud_subtitle),
         )
-        ToggleCard(
+        ToggleSectionCard(
             title = stringResource(R.string.onboarding_location_title),
-            subtitle = stringResource(R.string.onboarding_location_subtitle),
             checked = state.locationConsent,
             onCheckedChange = onLocationConsentChanged,
+            supportingText = stringResource(R.string.onboarding_location_subtitle),
         )
-        ToggleCard(
+        ToggleSectionCard(
             title = stringResource(R.string.onboarding_attachment_title),
-            subtitle = stringResource(R.string.onboarding_attachment_subtitle),
             checked = state.attachmentConsent,
             onCheckedChange = onAttachmentConsentChanged,
+            supportingText = stringResource(R.string.onboarding_attachment_subtitle),
         )
 
         Button(
@@ -161,17 +161,5 @@ fun OnboardingScreen(
         ) {
             Text(stringResource(R.string.onboarding_continue))
         }
-    }
-}
-
-@Composable
-private fun ToggleCard(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    HeadacheInsightSectionCard(title = title, supportingText = subtitle) {
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
