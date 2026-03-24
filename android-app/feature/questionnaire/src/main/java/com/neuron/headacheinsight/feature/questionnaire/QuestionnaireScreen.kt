@@ -371,11 +371,17 @@ private fun QuestionEditorCard(
     val multiValue = remember(question.id) { mutableStateListOf<String>() }
     var scaleValue by remember(question.id) { mutableStateOf(5f) }
     var voiceError by remember(question.id) { mutableStateOf<String?>(null) }
+    var voiceSessionActive by remember(question.id) { mutableStateOf(false) }
     var voiceListening by remember(question.id) { mutableStateOf(false) }
+    var voiceStopRequested by remember(question.id) { mutableStateOf(false) }
     var voiceRecognizer by remember(question.id) { mutableStateOf<SpeechRecognizer?>(null) }
+    var voiceLiveSegment by remember(question.id) { mutableStateOf("") }
+    val voiceSegments = remember(question.id) { mutableStateListOf<String>() }
 
     val voiceFillLabel = stringResource(R.string.questionnaire_voice_fill)
+    val voiceStopLabel = stringResource(R.string.questionnaire_voice_stop)
     val voiceListeningLabel = stringResource(R.string.questionnaire_voice_listening)
+    val voiceTranscriptLabel = stringResource(R.string.questionnaire_voice_transcript_label)
     val voicePermissionRequired = stringResource(R.string.questionnaire_voice_permission_required)
     val voiceUnavailable = stringResource(R.string.questionnaire_voice_unavailable)
     val voiceEmptyResult = stringResource(R.string.questionnaire_voice_empty_result)
@@ -387,6 +393,20 @@ private fun QuestionEditorCard(
     val optionLabels = remember(question.options, voiceLanguageTag) {
         question.options.associateWith { option -> localizedQuestionOptionLabel(option, voiceLanguageTag) }
     }
+    val hasPrimaryTextInput = when (question.answerType) {
+        AnswerType.NUMBER,
+        AnswerType.DATE_TIME,
+        AnswerType.DURATION,
+        AnswerType.FREE_TEXT,
+        AnswerType.MEDICATION_LIST,
+        AnswerType.ATTACHMENT_REQUEST,
+        AnswerType.VOICE_NOTE -> true
+        AnswerType.SINGLE_SELECT,
+        AnswerType.MULTI_SELECT -> question.options.isEmpty()
+        else -> false
+    }
+    val voiceTranscriptText = mergeVoiceTranscript(voiceSegments, voiceLiveSegment)
+    val showVoiceTranscriptField = question.voiceAllowed && (!hasPrimaryTextInput || voiceTranscriptText.isNotBlank() || voiceSessionActive)
 
     fun destroyVoiceRecognizer() {
         voiceRecognizer?.cancel()
@@ -437,15 +457,18 @@ private fun QuestionEditorCard(
         onSaveAnswer(question.id, payload)
     }
 
-    fun applyVoiceTranscript(rawTranscript: String): String? {
+    fun applyVoiceTranscript(
+        rawTranscript: String,
+        isPartial: Boolean = false,
+    ): String? {
         val transcript = rawTranscript.trim()
-        if (transcript.isBlank()) return voiceEmptyResult
+        if (transcript.isBlank()) return if (isPartial) null else voiceEmptyResult
 
         return when (question.answerType) {
             AnswerType.BOOLEAN -> {
                 val parsed = parseBooleanVoiceAnswer(transcript)
                 if (parsed == null) {
-                    voiceBooleanError
+                    if (isPartial) null else voiceBooleanError
                 } else {
                     booleanValue = parsed
                     null
@@ -455,7 +478,7 @@ private fun QuestionEditorCard(
             AnswerType.SCALE -> {
                 val parsed = parseIntegerVoiceAnswer(transcript)?.takeIf { it in 0..10 }
                 if (parsed == null) {
-                    voiceScaleError
+                    if (isPartial) null else voiceScaleError
                 } else {
                     scaleValue = parsed.toFloat()
                     null
@@ -470,7 +493,7 @@ private fun QuestionEditorCard(
                 } else {
                     val matched = matchSingleVoiceOption(transcript, question.options, voiceLanguageTag)
                     if (matched == null) {
-                        voiceOptionError
+                        if (isPartial) null else voiceOptionError
                     } else {
                         singleValue = matched
                         null
@@ -485,7 +508,7 @@ private fun QuestionEditorCard(
                 } else {
                     val matched = matchMultiVoiceOptions(transcript, question.options, voiceLanguageTag)
                     if (matched.isEmpty()) {
-                        voiceOptionError
+                        if (isPartial) null else voiceOptionError
                     } else {
                         multiValue.clear()
                         multiValue.addAll(matched)
@@ -497,7 +520,7 @@ private fun QuestionEditorCard(
             AnswerType.NUMBER -> {
                 val parsed = parseIntegerVoiceAnswer(transcript)
                 textValue = parsed?.toString() ?: transcript
-                if (parsed == null && transcript.none(Char::isDigit)) {
+                if (!isPartial && parsed == null && transcript.none(Char::isDigit)) {
                     voiceNumberError
                 } else {
                     null
@@ -509,6 +532,24 @@ private fun QuestionEditorCard(
                 null
             }
         }
+    }
+
+    fun applyCombinedVoiceTranscript(isPartial: Boolean): String? =
+        applyVoiceTranscript(mergeVoiceTranscript(voiceSegments, voiceLiveSegment), isPartial = isPartial)
+
+    fun updateVoiceTranscriptManually(value: String) {
+        voiceLiveSegment = ""
+        voiceSegments.clear()
+        value.trim().takeIf(String::isNotBlank)?.let(voiceSegments::add)
+        voiceError = if (value.isBlank()) null else applyCombinedVoiceTranscript(isPartial = false)
+    }
+
+    fun stopVoiceFill() {
+        voiceStopRequested = true
+        voiceSessionActive = false
+        voiceListening = false
+        voiceLiveSegment = ""
+        destroyVoiceRecognizer()
     }
 
     fun launchVoiceRecognition() {
@@ -533,7 +574,9 @@ private fun QuestionEditorCard(
         }
 
         voiceRecognizer = recognizer
+        voiceSessionActive = true
         voiceListening = true
+        voiceStopRequested = false
         voiceError = null
 
         recognizer.setRecognitionListener(
@@ -546,9 +589,25 @@ private fun QuestionEditorCard(
 
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
-                override fun onEndOfSpeech() = Unit
+                override fun onEndOfSpeech() {
+                    voiceListening = false
+                }
 
                 override fun onError(error: Int) {
+                    if (voiceStopRequested || error == SpeechRecognizer.ERROR_CLIENT) {
+                        voiceStopRequested = false
+                        voiceSessionActive = false
+                        voiceListening = false
+                        destroyVoiceRecognizer()
+                        return
+                    }
+                    if (voiceSessionActive && shouldRestartVoiceRecognition(error)) {
+                        voiceListening = false
+                        voiceError = null
+                        launchVoiceRecognition()
+                        return
+                    }
+                    voiceSessionActive = false
                     voiceListening = false
                     voiceError = mapVoiceRecognitionError(
                         errorCode = error,
@@ -560,12 +619,28 @@ private fun QuestionEditorCard(
                 }
 
                 override fun onResults(results: Bundle?) {
-                    voiceListening = false
-                    voiceError = applyVoiceTranscript(extractVoiceTranscript(results))
-                    destroyVoiceRecognizer()
+                    val transcript = extractVoiceTranscript(results)
+                    voiceLiveSegment = ""
+                    if (transcript.isNotBlank()) {
+                        val updatedSegments = mergeVoiceSegments(voiceSegments, transcript)
+                        voiceSegments.clear()
+                        voiceSegments.addAll(updatedSegments)
+                    }
+                    voiceError = applyCombinedVoiceTranscript(isPartial = false)
+                    if (voiceSessionActive && !voiceStopRequested) {
+                        voiceListening = false
+                        launchVoiceRecognition()
+                    } else {
+                        voiceSessionActive = false
+                        voiceListening = false
+                        destroyVoiceRecognizer()
+                    }
                 }
 
-                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onPartialResults(partialResults: Bundle?) {
+                    voiceLiveSegment = extractVoiceTranscript(partialResults)
+                    voiceError = applyCombinedVoiceTranscript(isPartial = true)
+                }
 
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
             },
@@ -577,12 +652,16 @@ private fun QuestionEditorCard(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, voiceLanguageTag)
             putExtra(RecognizerIntent.EXTRA_PROMPT, question.prompt)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, useOnDeviceRecognizer)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 30_000L)
         }
 
         runCatching { recognizer.startListening(intent) }
             .onFailure {
+                voiceSessionActive = false
                 voiceListening = false
                 voiceError = voiceUnavailable
                 destroyVoiceRecognizer()
@@ -594,6 +673,7 @@ private fun QuestionEditorCard(
     ) { granted ->
         if (granted) {
             voiceError = null
+            voiceStopRequested = false
             launchVoiceRecognition()
         } else {
             voiceError = voicePermissionRequired
@@ -601,10 +681,15 @@ private fun QuestionEditorCard(
     }
 
     fun startVoiceFill() {
+        if (voiceSessionActive) {
+            stopVoiceFill()
+            return
+        }
         val hasPermission =
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
             voiceError = null
+            voiceStopRequested = false
             launchVoiceRecognition()
         } else {
             voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -635,6 +720,12 @@ private fun QuestionEditorCard(
                 label = question.answerType.name.replace('_', ' '),
                 color = HeadacheInsightStatusColors.LocalComplete,
             )
+            if (question.voiceAllowed && voiceSessionActive) {
+                HeadacheInsightStatusBadge(
+                    label = voiceListeningLabel,
+                    color = HeadacheInsightStatusColors.CloudAnalyzed,
+                )
+            }
         }
 
         question.helpText?.let {
@@ -773,6 +864,16 @@ private fun QuestionEditorCard(
             }
         }
 
+        if (showVoiceTranscriptField) {
+            OutlinedTextField(
+                value = voiceTranscriptText,
+                onValueChange = ::updateVoiceTranscriptManually,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(voiceTranscriptLabel) },
+                minLines = if (hasPrimaryTextInput) 1 else 2,
+            )
+        }
+
         voiceError?.let {
             Text(
                 text = it,
@@ -784,10 +885,9 @@ private fun QuestionEditorCard(
             if (question.voiceAllowed) {
                 TextButton(
                     onClick = ::startVoiceFill,
-                    enabled = !voiceListening,
                     modifier = Modifier.padding(end = 8.dp),
                 ) {
-                    Text(if (voiceListening) voiceListeningLabel else voiceFillLabel)
+                    Text(if (voiceSessionActive) voiceStopLabel else voiceFillLabel)
                 }
             }
             TextButton(onClick = { saveCurrentAnswer() }, enabled = canSave) {
@@ -958,6 +1058,47 @@ private fun splitVoiceListItems(value: String): List<String> =
         .map(String::trim)
         .filter(String::isNotBlank)
         .distinct()
+
+private fun mergeVoiceTranscript(
+    committedSegments: List<String>,
+    liveSegment: String,
+): String =
+    (committedSegments + liveSegment.takeIf { it.isNotBlank() })
+        .filterNotNull()
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .joinToString(" ")
+        .trim()
+
+private fun mergeVoiceSegments(
+    existingSegments: List<String>,
+    incomingSegment: String,
+): List<String> {
+    val normalized = incomingSegment.trim()
+    if (normalized.isBlank()) return existingSegments
+    val updated = existingSegments.toMutableList()
+    val lastIndex = updated.indexOfLast { existing ->
+        val left = normalizeVoiceText(existing)
+        val right = normalizeVoiceText(normalized)
+        left == right || left.contains(right) || right.contains(left)
+    }
+    if (lastIndex >= 0) {
+        updated[lastIndex] =
+            if (normalized.length >= updated[lastIndex].length) normalized else updated[lastIndex]
+    } else {
+        updated += normalized
+    }
+    return updated
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .takeLast(8)
+}
+
+private fun shouldRestartVoiceRecognition(errorCode: Int): Boolean = when (errorCode) {
+    SpeechRecognizer.ERROR_NO_MATCH,
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> true
+    else -> false
+}
 
 private fun extractVoiceTranscript(results: Bundle?): String =
     results
