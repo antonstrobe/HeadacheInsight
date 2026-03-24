@@ -504,7 +504,7 @@ class BackendCloudSpeechEngine @Inject constructor(
                 ?.lowercase(Locale.ROOT)
                 ?.takeIf(String::isNotBlank)
                 ?.toRequestBody("text/plain".toMediaType()),
-            responseFormat = "verbose_json".toRequestBody("text/plain".toMediaType()),
+            responseFormat = "json".toRequestBody("text/plain".toMediaType()),
         )
         EpisodeTranscript(
             id = MessageDigest.getInstance("SHA-256").digest(audioFile.absolutePath.encodeToByteArray()).joinToString("") { "%02x".format(it) },

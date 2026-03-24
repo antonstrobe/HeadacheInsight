@@ -71,6 +71,7 @@ import com.neuron.headacheinsight.core.ui.SelectableChipGroup
 import com.neuron.headacheinsight.core.ui.SeveritySlider
 import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.AudioRecorder
+import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.CreateEpisodeUseCase
 import com.neuron.headacheinsight.domain.EpisodeRepository
 import com.neuron.headacheinsight.domain.RedFlagEngine
@@ -137,6 +138,7 @@ class QuickLogViewModel @Inject constructor(
     private val saveTranscriptUseCase: SaveTranscriptUseCase,
     private val redFlagEngine: RedFlagEngine,
     private val audioRecorder: AudioRecorder,
+    private val cloudSpeechRecognizerEngine: CloudSpeechRecognizerEngine,
     private val syncScheduler: SyncScheduler,
     private val timeProvider: TimeProvider,
     private val voiceIntakeRepository: VoiceIntakeRepository,
@@ -201,24 +203,34 @@ class QuickLogViewModel @Inject constructor(
         val episode = state.value.episode ?: return
         viewModelScope.launch {
             if (state.value.isRecording) {
+                val currentState = state.value
                 val result = audioRecorder.stop()
                 val path = result.getOrNull()
-                if (path != null) {
+                val shouldTranscribeInline =
+                    path != null &&
+                        currentState.transcriptHistory.isEmpty() &&
+                        currentState.liveTranscriptPreview.isBlank()
+                if (path != null && !shouldTranscribeInline) {
                     syncScheduler.enqueueTranscription(path, episode.id)
                 }
                 draft.emit(
-                    state.value.copy(
+                    currentState.copy(
                         isRecording = false,
                         lastAudioPath = path,
+                        isVoiceProcessing = shouldTranscribeInline,
                         voiceErrorMessage = result.exceptionOrNull()?.message,
                     ),
                 )
+                if (path != null && shouldTranscribeInline && result.isSuccess) {
+                    transcribeRecordedAudio(audioPath = path, episode = episode)
+                }
             } else {
                 val result = audioRecorder.start(episode.id)
                 draft.emit(
                     state.value.copy(
                         isRecording = result.isSuccess,
                         lastAudioPath = result.getOrNull(),
+                        isVoiceProcessing = false,
                         voiceErrorMessage = result.exceptionOrNull()?.message,
                     ),
                 )
@@ -369,6 +381,66 @@ class QuickLogViewModel @Inject constructor(
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString("\n")
+
+    private suspend fun transcribeRecordedAudio(audioPath: String, episode: Episode) {
+        draft.emit(state.value.copy(isVoiceProcessing = true, voiceErrorMessage = null))
+        cloudSpeechRecognizerEngine.transcribeAudio(audioPath, episode.locale).fold(
+            onSuccess = { transcript ->
+                val normalized = transcript.transcriptText?.trim().orEmpty()
+                if (normalized.isBlank()) {
+                    draft.emit(
+                        state.value.copy(
+                            isVoiceProcessing = false,
+                            voiceErrorMessage = if (episode.locale.startsWith("ru", ignoreCase = true)) {
+                                "OpenAI вернул пустую расшифровку."
+                            } else {
+                                "OpenAI returned an empty transcript."
+                            },
+                        ),
+                    )
+                    syncScheduler.enqueueTranscription(audioPath, episode.id)
+                    return@fold
+                }
+                val now = timeProvider.now()
+                episodeRepository.updateEpisode(
+                    episode.copy(
+                        summaryText = normalized,
+                        transcriptStatus = TranscriptStatus.MERGED_READY,
+                        updatedAt = now,
+                    ),
+                )
+                saveTranscriptUseCase(
+                    transcript.copy(
+                        episodeId = episode.id,
+                        rawAudioPath = audioPath,
+                        language = transcript.language ?: episode.locale,
+                        createdAt = now,
+                    ),
+                    shouldCloudRetry = false,
+                )
+                draft.emit(
+                    state.value.copy(
+                        transcriptHistory = listOf(normalized),
+                        liveTranscriptPreview = "",
+                        lastTranscriptText = normalized,
+                        lastAudioPath = audioPath,
+                        isVoiceProcessing = false,
+                        voiceErrorMessage = null,
+                    ),
+                )
+                transcriptForStructuring.emit(normalized)
+            },
+            onFailure = { error ->
+                draft.emit(
+                    state.value.copy(
+                        isVoiceProcessing = false,
+                        voiceErrorMessage = error.message,
+                    ),
+                )
+                syncScheduler.enqueueTranscription(audioPath, episode.id)
+            },
+        )
+    }
 }
 
 @Composable
@@ -442,10 +514,9 @@ fun QuickLogScreen(
         }
     }
 
-    fun startLiveRecognizer() {
+    fun startLiveRecognizer(): Boolean {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
-            return
+            return false
         }
         disposeSpeechRecognizer()
         val recognizer = runCatching {
@@ -455,8 +526,7 @@ fun QuickLogScreen(
                 SpeechRecognizer.createSpeechRecognizer(context)
             }
         }.getOrElse {
-            onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
-            return
+            return false
         }
         speechRecognizer = recognizer
         recognizer.setRecognitionListener(
@@ -527,6 +597,7 @@ fun QuickLogScreen(
         )
         onVoiceError(null)
         recognizer.startListening(buildLiveDictationIntent(context, localeTag))
+        return true
     }
 
     DisposableEffect(context) {
@@ -568,6 +639,7 @@ fun QuickLogScreen(
             stopVoiceSession(stopAudioRecording = true)
         } else {
             ensureMicrophonePermission {
+                onVoiceError(null)
                 if (!state.isRecording) {
                     onToggleVoiceRecording()
                 }
