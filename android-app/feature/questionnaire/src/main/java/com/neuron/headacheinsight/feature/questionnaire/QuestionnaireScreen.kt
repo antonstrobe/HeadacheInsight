@@ -1277,24 +1277,59 @@ private fun mergeVoiceSegments(
     existingSegments: List<String>,
     incomingSegment: String,
 ): List<String> {
-    val normalized = incomingSegment.trim()
-    if (normalized.isBlank()) return existingSegments
-    val updated = existingSegments.toMutableList()
-    val lastIndex = updated.indexOfLast { existing ->
-        val left = normalizeVoiceText(existing)
-        val right = normalizeVoiceText(normalized)
-        left == right || left.contains(right) || right.contains(left)
+    val incoming = incomingSegment.trim()
+    if (incoming.isBlank()) return existingSegments
+
+    val existingText = mergeVoiceTranscript(existingSegments, "").trim()
+    if (existingText.isBlank()) return listOf(incoming)
+
+    val normalizedExisting = normalizeVoiceText(existingText)
+    val normalizedIncoming = normalizeVoiceText(incoming)
+    if (normalizedExisting.isBlank()) return listOf(incoming)
+
+    if (normalizedExisting == normalizedIncoming) {
+        return listOf(if (incoming.length >= existingText.length) incoming else existingText)
     }
-    if (lastIndex >= 0) {
-        updated[lastIndex] =
-            if (normalized.length >= updated[lastIndex].length) normalized else updated[lastIndex]
-    } else {
-        updated += normalized
+
+    if (normalizedExisting.contains(normalizedIncoming)) {
+        return listOf(existingText)
     }
-    return updated
-        .map(String::trim)
-        .filter(String::isNotBlank)
-        .takeLast(8)
+
+    if (normalizedIncoming.contains(normalizedExisting)) {
+        return listOf(incoming)
+    }
+
+    val mergedText = mergeVoiceTranscriptWithOverlap(existingText, incoming)
+    return listOf(mergedText)
+}
+
+private fun mergeVoiceTranscriptWithOverlap(
+    existingText: String,
+    incomingText: String,
+): String {
+    val existingTokens = existingText.trim().split(Regex("\\s+")).filter(String::isNotBlank)
+    val incomingTokens = incomingText.trim().split(Regex("\\s+")).filter(String::isNotBlank)
+    if (existingTokens.isEmpty()) return incomingText.trim()
+    if (incomingTokens.isEmpty()) return existingText.trim()
+
+    val normalizedExisting = existingTokens.map(::normalizeVoiceText)
+    val normalizedIncoming = incomingTokens.map(::normalizeVoiceText)
+    val maxOverlap = minOf(normalizedExisting.size, normalizedIncoming.size)
+
+    for (overlapSize in maxOverlap downTo 1) {
+        val existingSuffix = normalizedExisting.takeLast(overlapSize)
+        val incomingPrefix = normalizedIncoming.take(overlapSize)
+        if (existingSuffix == incomingPrefix) {
+            val suffixTokens = incomingTokens.drop(overlapSize)
+            return if (suffixTokens.isEmpty()) {
+                existingText.trim()
+            } else {
+                (existingTokens + suffixTokens).joinToString(" ").trim()
+            }
+        }
+    }
+
+    return (existingTokens + incomingTokens).joinToString(" ").trim()
 }
 
 private fun createQuestionnaireAudioSnapshot(sourcePath: String): String? {
