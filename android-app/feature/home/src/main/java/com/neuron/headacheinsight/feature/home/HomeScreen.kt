@@ -33,6 +33,8 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.domain.ObserveHomeDashboardUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -118,6 +120,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = preferredHorizontalAlignment(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Button(
@@ -148,17 +151,25 @@ fun HomeScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp, vertical = 20.dp)
                 .verticalScroll(rememberScrollState()),
+            horizontalAlignment = preferredHorizontalAlignment(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                horizontalAlignment = preferredHorizontalAlignment(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     text = stringResource(R.string.home_info_title),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.headlineMedium,
+                    textAlign = preferredTextAlign(),
                 )
                 Text(
                     text = stringResource(R.string.home_info_subtitle),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.outline,
+                    textAlign = preferredTextAlign(),
                 )
             }
 
@@ -180,7 +191,9 @@ fun HomeScreen(
                 )
                 Text(
                     text = stringResource(R.string.home_monthly_headache_days, state.monthlyHeadacheDays),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
+                    textAlign = preferredTextAlign(),
                 )
             }
 

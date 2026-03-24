@@ -57,6 +57,9 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.designsystem.KeyValueLine
 import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredSpacedArrangement
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.EpisodeMedication
 import com.neuron.headacheinsight.core.model.EpisodeSymptom
@@ -273,7 +276,11 @@ class QuickLogViewModel @Inject constructor(
                 },
                 redFlagEvaluation = evaluation,
             )
-            persistMedicationNotes(episode.id, state.value.medicineNotes)
+            persistMedicationNotes(
+                episodeId = episode.id,
+                rawNotes = state.value.medicineNotes,
+                additionalItems = state.value.voiceDraft?.medications.orEmpty(),
+            )
             draft.emit(
                 state.value.copy(
                     interruptedBySafety = evaluation.shouldInterruptFlow,
@@ -294,8 +301,7 @@ class QuickLogViewModel @Inject constructor(
             confusion = current.confusion || voiceDraft.redFlags.contains("confusion"),
             speechDifficulty = current.speechDifficulty || voiceDraft.redFlags.contains("speechDifficulty"),
             oneSidedWeakness = current.oneSidedWeakness || voiceDraft.redFlags.contains("oneSidedWeakness"),
-            medicineNotes = mergeTextBlocks(current.medicineNotes, voiceDraft.medications.joinToString("\n")),
-            notesText = mergeTextBlocks(current.notesText, voiceDraft.summaryText),
+            notesText = mergeTextBlocks(current.notesText, buildVoiceNarrative(voiceDraft)),
             voiceDraft = voiceDraft,
             isVoiceProcessing = false,
             voiceErrorMessage = null,
@@ -332,12 +338,20 @@ class QuickLogViewModel @Inject constructor(
                 )
             },
         )
-        persistMedicationNotes(episode.id, uiState.medicineNotes)
+        persistMedicationNotes(
+            episodeId = episode.id,
+            rawNotes = uiState.medicineNotes,
+            additionalItems = uiState.voiceDraft?.medications.orEmpty(),
+        )
     }
 
-    private suspend fun persistMedicationNotes(episodeId: String, rawNotes: String) {
-        rawNotes
-            .split('\n', ',')
+    private suspend fun persistMedicationNotes(
+        episodeId: String,
+        rawNotes: String,
+        additionalItems: List<String> = emptyList(),
+    ) {
+        (rawNotes
+            .split('\n', ',') + additionalItems)
             .map(String::trim)
             .filter { it.isNotBlank() }
             .distinct()
@@ -353,6 +367,14 @@ class QuickLogViewModel @Inject constructor(
                 )
             }
     }
+
+    private fun buildVoiceNarrative(voiceDraft: VoiceIntakeDraft): String =
+        listOf(
+            voiceDraft.summaryText,
+            voiceDraft.medications.joinToString("\n"),
+            voiceDraft.liveNotes.joinToString("\n"),
+        ).filter { it.isNotBlank() }
+            .joinToString("\n")
 
     private suspend fun prepareFollowUpQuestions(episodeId: String) {
         draft.emit(
@@ -673,6 +695,7 @@ fun QuickLogScreen(
                         .imePadding()
                         .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = preferredHorizontalAlignment(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Button(
@@ -711,6 +734,7 @@ fun QuickLogScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
+            horizontalAlignment = preferredHorizontalAlignment(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HeadacheInsightSectionCard(
@@ -722,6 +746,8 @@ fun QuickLogScreen(
                         R.string.quicklog_episode_id,
                         state.episode?.id ?: stringResource(R.string.quicklog_episode_creating),
                     ),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = preferredTextAlign(),
                 )
                 VoiceSessionStatus(
                     isListening = isVoiceSessionActive,
@@ -749,14 +775,18 @@ fun QuickLogScreen(
                     )
                     Text(
                         text = stringResource(R.string.quicklog_follow_up_hint),
+                        modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline,
+                        textAlign = preferredTextAlign(),
                     )
                 }
                 state.followUpErrorMessage?.let {
                     Text(
                         text = stringResource(R.string.quicklog_follow_up_error, it),
                         color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = preferredTextAlign(),
                     )
                 }
                 SeveritySlider(severity = state.severity, onSeverityChanged = onSeverityChanged)
@@ -767,19 +797,26 @@ fun QuickLogScreen(
                 supportingText = stringResource(R.string.quicklog_live_subtitle),
             ) {
                 if (transcriptFeed.isEmpty()) {
-                    Text(stringResource(R.string.quicklog_live_empty))
+                    Text(
+                        text = stringResource(R.string.quicklog_live_empty),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = preferredTextAlign(),
+                    )
                 } else {
                     transcriptFeed.forEachIndexed { index, item ->
                         Text(
                             text = item,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .alpha(
+                                    if (index == transcriptFeed.lastIndex && state.liveTranscriptPreview.isNotBlank()) 0.86f else 1f,
+                                ),
                             style = if (index == transcriptFeed.lastIndex) {
                                 MaterialTheme.typography.bodyLarge
                             } else {
                                 MaterialTheme.typography.bodyMedium
                             },
-                            modifier = Modifier.alpha(
-                                if (index == transcriptFeed.lastIndex && state.liveTranscriptPreview.isNotBlank()) 0.86f else 1f,
-                            ),
+                            textAlign = preferredTextAlign(),
                         )
                     }
                 }
@@ -820,6 +857,7 @@ fun QuickLogScreen(
                     value = state.notesText,
                     onValueChange = onNotesTextChanged,
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                     label = { Text(stringResource(R.string.quicklog_notes_label)) },
                     minLines = 2,
                 )
@@ -827,6 +865,7 @@ fun QuickLogScreen(
                     value = state.medicineNotes,
                     onValueChange = onMedicineNotesChanged,
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                     label = { Text(stringResource(R.string.quicklog_medication_label)) },
                     minLines = 2,
                 )
@@ -842,29 +881,51 @@ fun QuickLogScreen(
                     }
                     if (voiceDraft.liveNotes.isNotEmpty()) {
                         voiceDraft.liveNotes.forEach { note ->
-                            Text(note)
+                            Text(
+                                text = note,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = preferredTextAlign(),
+                            )
                         }
                     }
                 }
             }
 
             if (permissionDenied) {
-                Text(stringResource(R.string.quicklog_audio_permission_required))
+                Text(
+                    text = stringResource(R.string.quicklog_audio_permission_required),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = preferredTextAlign(),
+                )
             }
             state.lastAudioPath?.let {
-                Text(stringResource(R.string.quicklog_audio_saved, it))
+                Text(
+                    text = stringResource(R.string.quicklog_audio_saved, it),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = preferredTextAlign(),
+                )
             }
             state.lastTranscriptText?.let {
-                Text(stringResource(R.string.quicklog_dictation_saved, it))
+                Text(
+                    text = stringResource(R.string.quicklog_dictation_saved, it),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = preferredTextAlign(),
+                )
             }
             state.voiceErrorMessage?.let {
                 Text(
                     text = stringResource(R.string.quicklog_voice_error, it),
+                    modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.error,
+                    textAlign = preferredTextAlign(),
                 )
             }
             if (state.urgentMessage.isNotBlank()) {
-                Text(state.urgentMessage)
+                Text(
+                    text = state.urgentMessage,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = preferredTextAlign(),
+                )
             }
         }
     }
@@ -888,7 +949,7 @@ private fun VoiceSessionStatus(
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = preferredSpacedArrangement(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PulsingDot(active = isListening, color = HeadacheInsightStatusColors.CloudAnalyzed)
@@ -913,7 +974,10 @@ private fun LiveTranscriptHero(
             } else {
                 MaterialTheme.colorScheme.onSurface
             },
-            modifier = Modifier.alpha(if (isListening && transcript.isNotBlank()) 0.96f else 1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(if (isListening && transcript.isNotBlank()) 0.96f else 1f),
+            textAlign = preferredTextAlign(),
         )
     }
 }

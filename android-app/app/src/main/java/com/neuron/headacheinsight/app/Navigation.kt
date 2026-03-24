@@ -17,7 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.neuron.headacheinsight.core.ui.LocalHandPreference
+import com.neuron.headacheinsight.core.designsystem.LocalHandPreference
 import com.neuron.headacheinsight.feature.attachments.AttachmentsRoute
 import com.neuron.headacheinsight.feature.episode.EpisodeRoute
 import com.neuron.headacheinsight.feature.home.HomeRoute

@@ -29,6 +29,9 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
+import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
@@ -240,6 +243,7 @@ fun SettingsScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
+        horizontalAlignment = preferredHorizontalAlignment(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HeadacheInsightSectionCard(
@@ -250,6 +254,7 @@ fun SettingsScreen(
                 value = apiKeyState,
                 onValueChange = { apiKeyState = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.settings_openai_key_label)) },
                 supportingText = { Text(stringResource(R.string.settings_openai_storage_note)) },
                 singleLine = true,
@@ -281,6 +286,7 @@ fun SettingsScreen(
                 value = analysisModelState,
                 onValueChange = { analysisModelState = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.settings_analysis_model_label)) },
                 singleLine = true,
             )
@@ -288,6 +294,7 @@ fun SettingsScreen(
                 value = questionModelState,
                 onValueChange = { questionModelState = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.settings_question_model_label)) },
                 singleLine = true,
             )
@@ -295,6 +302,7 @@ fun SettingsScreen(
                 value = transcribeModelState,
                 onValueChange = { transcribeModelState = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.settings_transcribe_model_label)) },
                 singleLine = true,
             )
@@ -379,23 +387,42 @@ private fun ConnectionStatusBlock(
         color = badgeColor,
     )
     state.connectionStatus?.let { status ->
-        Text(stringResource(R.string.settings_connection_service, status.serviceName))
-        Text(stringResource(R.string.settings_connection_models, status.analysisModel, status.questionModel, status.transcribeModel))
+        Text(
+            text = stringResource(R.string.settings_connection_service, status.serviceName),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = preferredTextAlign(),
+        )
+        Text(
+            text = stringResource(
+                R.string.settings_connection_models,
+                status.analysisModel,
+                status.questionModel,
+                status.transcribeModel,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = preferredTextAlign(),
+        )
         Text(
             if (status.apiKeyPresent) {
                 stringResource(R.string.settings_connection_key_present)
             } else {
                 stringResource(R.string.settings_connection_key_missing)
             },
+            modifier = Modifier.fillMaxWidth(),
             color = if (status.apiKeyPresent) {
                 MaterialTheme.colorScheme.tertiary
             } else {
                 MaterialTheme.colorScheme.outline
             },
+            textAlign = preferredTextAlign(),
         )
     }
     state.connectionErrorMessage?.let { message ->
-        Text(stringResource(R.string.settings_connection_error_message, message))
+        Text(
+            text = stringResource(R.string.settings_connection_error_message, message),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = preferredTextAlign(),
+        )
     }
 }
 
@@ -405,15 +432,34 @@ private fun SelectionOptionButton(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        val text = if (selected) {
-            stringResource(R.string.settings_language_selected, label)
-        } else {
-            label
+    val text = if (selected) {
+        stringResource(R.string.settings_language_selected, label)
+    } else {
+        label
+    }
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            colors = headacheInsightActionButtonColors(),
+        ) {
+            Text(
+                text = text,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = preferredTextAlign(),
+            )
         }
-        Text(text = text, color = MaterialTheme.colorScheme.onSurface)
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = text,
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = preferredTextAlign(),
+            )
+        }
     }
 }

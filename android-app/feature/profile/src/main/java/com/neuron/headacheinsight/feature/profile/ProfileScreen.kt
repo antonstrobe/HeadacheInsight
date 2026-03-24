@@ -20,6 +20,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.UserProfile
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.domain.ProfileRepository
@@ -82,6 +84,7 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
+        horizontalAlignment = preferredHorizontalAlignment(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HeadacheInsightSectionCard(title = stringResource(R.string.profile_title)) {
@@ -89,12 +92,14 @@ fun ProfileScreen(
                 value = displayName,
                 onValueChange = { displayName = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.profile_display_name)) },
             )
             OutlinedTextField(
                 value = cityRegion,
                 onValueChange = { cityRegion = it },
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.profile_city_region)) },
             )
         }

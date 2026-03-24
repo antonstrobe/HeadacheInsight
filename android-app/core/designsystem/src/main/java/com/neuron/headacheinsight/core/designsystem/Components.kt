@@ -1,5 +1,6 @@
 package com.neuron.headacheinsight.core.designsystem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -37,14 +39,33 @@ fun HeadacheInsightSectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = HeadacheInsightCardDefaults.elevated(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
+            horizontalAlignment = preferredHorizontalAlignment(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(text = title, style = MaterialTheme.typography.titleLarge)
+            Box(
+                modifier = Modifier
+                    .size(width = 44.dp, height = 4.dp)
+                    .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                    .align(preferredHorizontalAlignment()),
+            )
+            Text(
+                text = title,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = preferredTextAlign(),
+            )
             supportingText?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                Text(
+                    text = it,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = preferredTextAlign(),
+                )
             }
             content()
         }
@@ -84,17 +105,25 @@ fun HeadacheInsightPrimaryPainButton(
 ) {
     Button(
         onClick = onClick,
-        colors = headacheInsightActionButtonColors(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
         modifier = modifier
             .fillMaxWidth()
-            .height(78.dp),
+            .height(84.dp),
     ) {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = preferredSpacedArrangement(14.dp),
         ) {
             Icon(imageVector = icon, contentDescription = null)
-            Text(text = label, style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -106,16 +135,20 @@ fun KeyValueLine(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = preferredSpacedArrangement(12.dp),
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-        Spacer(modifier = Modifier.size(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.size(4.dp))
         Text(text = value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
 @Composable
 fun headacheInsightActionButtonColors(): ButtonColors = ButtonDefaults.buttonColors(
-    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    containerColor = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
 )

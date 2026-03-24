@@ -1,7 +1,6 @@
 package com.neuron.headacheinsight.core.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,27 +19,35 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightCardDefaults
+import com.neuron.headacheinsight.core.designsystem.LocalHandPreference
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalArrangement
+import com.neuron.headacheinsight.core.designsystem.preferredSpacedArrangement
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.HandPreference
-
-val LocalHandPreference = staticCompositionLocalOf { HandPreference.RIGHT }
 
 @Composable
 fun SeveritySlider(
     severity: Int,
     onSeverityChanged: (Int) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        horizontalAlignment = preferredHorizontalAlignment(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             text = stringResource(R.string.severity_now, severity),
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyLarge,
+            textAlign = preferredTextAlign(),
         )
         Slider(
             value = severity.toFloat(),
@@ -61,7 +68,7 @@ fun SelectableChipGroup(
 ) {
     HeadacheInsightSectionCard(title = title) {
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = preferredSpacedArrangement(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             options.forEach { option ->
@@ -98,7 +105,9 @@ fun EpisodeTimelineList(
             ) {
                 Text(
                     text = episode.summaryText ?: stringResource(R.string.partial_entry),
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
+                    textAlign = preferredTextAlign(),
                 )
                 SectionActionRow {
                     androidx.compose.material3.TextButton(onClick = { onOpenEpisode(episode.id) }) {
@@ -123,14 +132,9 @@ fun SectionActionRow(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val handPreference = LocalHandPreference.current
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (handPreference == HandPreference.RIGHT) {
-            Arrangement.End
-        } else {
-            Arrangement.Start
-        },
+        horizontalArrangement = preferredHorizontalArrangement(),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -150,29 +154,40 @@ fun ToggleSectionCard(
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
+            horizontalAlignment = preferredHorizontalAlignment(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (LocalHandPreference.current == HandPreference.LEFT) {
+                    Switch(
+                        checked = checked,
+                        onCheckedChange = onCheckedChange,
+                    )
+                }
                 Text(
                     text = title,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(end = 76.dp),
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleLarge,
+                    textAlign = preferredTextAlign(),
                 )
-                Switch(
-                    checked = checked,
-                    onCheckedChange = onCheckedChange,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                )
+                if (LocalHandPreference.current == HandPreference.RIGHT) {
+                    Switch(
+                        checked = checked,
+                        onCheckedChange = onCheckedChange,
+                    )
+                }
             }
             supportingText?.let {
                 Text(
                     text = it,
+                    modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
+                    textAlign = preferredTextAlign(),
                 )
             }
         }

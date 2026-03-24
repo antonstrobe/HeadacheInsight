@@ -71,7 +71,11 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.designsystem.KeyValueLine
+import com.neuron.headacheinsight.core.designsystem.LocalHandPreference
 import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredSpacedArrangement
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.AnswerType
 import com.neuron.headacheinsight.core.model.EpisodeDetail
@@ -79,7 +83,6 @@ import com.neuron.headacheinsight.core.model.HandPreference
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.EmptyState
-import com.neuron.headacheinsight.core.ui.LocalHandPreference
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.AnalysisRepository
 import com.neuron.headacheinsight.domain.AudioRecorder
@@ -244,6 +247,7 @@ fun QuestionnaireScreen(
                         .imePadding()
                         .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = preferredHorizontalAlignment(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Button(
@@ -468,7 +472,9 @@ private fun QuestionEditorCard(
         else -> false
     }
     val voiceTranscriptText = mergeVoiceTranscript(voiceSegments, voiceLiveSegment)
-    val showVoiceTranscriptField = question.voiceAllowed && (!hasPrimaryTextInput || voiceTranscriptText.isNotBlank() || voiceSessionActive)
+    val showVoiceTranscriptField = question.voiceAllowed &&
+        !hasPrimaryTextInput &&
+        (voiceTranscriptText.isNotBlank() || voiceSessionActive)
     val voicePulseTransition = rememberInfiniteTransition(label = "questionnaire-voice-button")
     val voicePulseProgress by voicePulseTransition.animateFloat(
         initialValue = 0.18f,
@@ -867,7 +873,7 @@ private fun QuestionEditorCard(
         }
 
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = preferredSpacedArrangement(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             HeadacheInsightStatusBadge(
@@ -897,8 +903,10 @@ private fun QuestionEditorCard(
         question.helpText?.let {
             Text(
                 text = it,
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline,
+                textAlign = preferredTextAlign(),
             )
         }
 
@@ -940,11 +948,12 @@ private fun QuestionEditorCard(
                             voiceError = null
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                         label = { Text(stringResource(R.string.questionnaire_answer_label)) },
                     )
                 } else {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = preferredSpacedArrangement(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         question.options.forEach { option ->
@@ -970,11 +979,12 @@ private fun QuestionEditorCard(
                             voiceError = null
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                         label = { Text(stringResource(R.string.questionnaire_answer_label)) },
                     )
                 } else {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = preferredSpacedArrangement(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         question.options.forEach { option ->
@@ -1004,6 +1014,7 @@ private fun QuestionEditorCard(
                         voiceError = null
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                     label = { Text(stringResource(R.string.questionnaire_number_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
@@ -1017,6 +1028,7 @@ private fun QuestionEditorCard(
                         voiceError = null
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                     label = { Text(question.helpText ?: stringResource(R.string.questionnaire_answer_label)) },
                     minLines = if (question.answerType == AnswerType.FREE_TEXT || question.answerType == AnswerType.MEDICATION_LIST) 3 else 1,
                     keyboardOptions = KeyboardOptions(
@@ -1035,6 +1047,7 @@ private fun QuestionEditorCard(
                 value = voiceTranscriptText,
                 onValueChange = ::updateVoiceTranscriptManually,
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(voiceTranscriptLabel) },
                 minLines = if (hasPrimaryTextInput) 1 else 2,
             )
@@ -1044,12 +1057,14 @@ private fun QuestionEditorCard(
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = preferredTextAlign(),
             )
         }
 
         SectionActionRow(modifier = Modifier.animateContentSize()) {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = preferredSpacedArrangement(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val saveButton: @Composable () -> Unit = {

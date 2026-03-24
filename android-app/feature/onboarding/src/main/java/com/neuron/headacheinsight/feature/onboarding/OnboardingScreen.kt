@@ -19,6 +19,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.ProfileRepository
 import com.neuron.headacheinsight.domain.UpsertProfileUseCase
@@ -107,6 +109,7 @@ fun OnboardingScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
+        horizontalAlignment = preferredHorizontalAlignment(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HeadacheInsightSectionCard(
@@ -121,12 +124,14 @@ fun OnboardingScreen(
                 value = state.displayName,
                 onValueChange = onDisplayNameChanged,
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.onboarding_name_label)) },
             )
             OutlinedTextField(
                 value = state.cityRegion,
                 onValueChange = onCityRegionChanged,
                 modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
                 label = { Text(stringResource(R.string.onboarding_city_label)) },
             )
         }

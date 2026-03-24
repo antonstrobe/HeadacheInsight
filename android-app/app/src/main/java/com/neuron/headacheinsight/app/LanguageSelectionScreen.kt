@@ -17,10 +17,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.neuron.headacheinsight.R
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
+import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
+import com.neuron.headacheinsight.core.designsystem.preferredSpacedArrangement
+import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 
 @Composable
 fun LanguageSelectionScreen(
@@ -31,6 +35,7 @@ fun LanguageSelectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
+        horizontalAlignment = preferredHorizontalAlignment(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HeadacheInsightSectionCard(
@@ -39,7 +44,9 @@ fun LanguageSelectionScreen(
         ) {
             Text(
                 text = stringResource(R.string.language_screen_description),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
+                textAlign = preferredTextAlign(),
             )
         }
 
@@ -63,7 +70,9 @@ fun LanguageSelectionScreen(
         ) {
             Text(
                 text = stringResource(R.string.language_next_description),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
+                textAlign = preferredTextAlign(),
             )
         }
     }
@@ -85,7 +94,7 @@ private fun LanguageOptionButton(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = preferredSpacedArrangement(16.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -94,9 +103,22 @@ private fun LanguageOptionButton(
             ) {
                 Text(text = badge, color = MaterialTheme.colorScheme.onPrimary)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+            Column(
+                horizontalAlignment = preferredHorizontalAlignment(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Start,
+                )
+                Text(
+                    text = subtitle,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Start,
+                )
             }
         }
     }
