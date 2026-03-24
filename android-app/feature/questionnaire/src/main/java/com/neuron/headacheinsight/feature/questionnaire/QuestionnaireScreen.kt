@@ -1,11 +1,9 @@
 package com.neuron.headacheinsight.feature.questionnaire
 
 import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -48,9 +46,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.lerp
@@ -60,6 +60,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -78,17 +82,24 @@ import com.neuron.headacheinsight.core.ui.EmptyState
 import com.neuron.headacheinsight.core.ui.LocalHandPreference
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.AnalysisRepository
+import com.neuron.headacheinsight.domain.AudioRecorder
+import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.EpisodeRepository
 import com.neuron.headacheinsight.domain.ObserveQuestionSetUseCase
 import com.neuron.headacheinsight.domain.SaveQuestionAnswerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.File
+import java.io.RandomAccessFile
 import javax.inject.Inject
 import java.util.Locale
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -110,6 +121,13 @@ data class QuestionnaireUiState(
     val analysisError: String? = null,
     val generatedQuestionCount: Int? = null,
 )
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface QuestionnaireVoiceEntryPoint {
+    fun audioRecorder(): AudioRecorder
+    fun cloudSpeechRecognizerEngine(): CloudSpeechRecognizerEngine
+}
 
 @HiltViewModel
 class QuestionnaireViewModel @Inject constructor(
@@ -214,6 +232,8 @@ fun QuestionnaireScreen(
     val voiceLanguageTag = state.episodeDetail?.episode?.locale
         ?.takeIf(String::isNotBlank)
         ?: Locale.getDefault().toLanguageTag()
+    var activeVoiceQuestionId by remember(state.episodeDetail?.episode?.id) { mutableStateOf<String?>(null) }
+    val voiceOwnerId = state.episodeDetail?.episode?.id ?: "questionnaire"
 
     androidx.compose.material3.Scaffold(
         bottomBar = {
@@ -320,6 +340,9 @@ fun QuestionnaireScreen(
             items(state.questions, key = { it.id }) { question ->
                 QuestionEditorCard(
                     question = question,
+                    voiceOwnerId = voiceOwnerId,
+                    activeVoiceQuestionId = activeVoiceQuestionId,
+                    onActiveVoiceQuestionChanged = { activeVoiceQuestionId = it },
                     voiceLanguageTag = voiceLanguageTag,
                     onSaveAnswer = onSaveAnswer,
                 )
@@ -376,11 +399,23 @@ private fun AnalysisSummaryCard(
 @Composable
 private fun QuestionEditorCard(
     question: QuestionTemplate,
+    voiceOwnerId: String,
+    activeVoiceQuestionId: String?,
+    onActiveVoiceQuestionChanged: (String?) -> Unit,
     voiceLanguageTag: String,
     onSaveAnswer: (String, JsonElement) -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val handPreference = LocalHandPreference.current
+    val voiceServices = remember(context.applicationContext) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            QuestionnaireVoiceEntryPoint::class.java,
+        )
+    }
+    val audioRecorder = voiceServices.audioRecorder()
+    val cloudSpeechRecognizerEngine = voiceServices.cloudSpeechRecognizerEngine()
     var textValue by remember(question.id) { mutableStateOf("") }
     var booleanValue by remember(question.id) { mutableStateOf<Boolean?>(null) }
     var singleValue by remember(question.id) { mutableStateOf<String?>(null) }
@@ -393,6 +428,8 @@ private fun QuestionEditorCard(
     var voiceStopRequested by remember(question.id) { mutableStateOf(false) }
     var voiceRecognizer by remember(question.id) { mutableStateOf<SpeechRecognizer?>(null) }
     var voiceLiveSegment by remember(question.id) { mutableStateOf("") }
+    var voiceAudioPath by remember(question.id) { mutableStateOf<String?>(null) }
+    var voicePreviewJob by remember(question.id) { mutableStateOf<Job?>(null) }
     var showClearConfirmation by remember(question.id) { mutableStateOf(false) }
     val voiceSegments = remember(question.id) { mutableStateListOf<String>() }
     val voiceHandler = remember(question.id) { Handler(Looper.getMainLooper()) }
@@ -460,55 +497,9 @@ private fun QuestionEditorCard(
         .widthIn(min = 124.dp)
         .defaultMinSize(minHeight = 48.dp)
 
-    fun destroyVoiceRecognizer() {
-        voiceHandler.removeCallbacksAndMessages(null)
-        voiceRecognizer?.cancel()
-        voiceRecognizer?.destroy()
-        voiceRecognizer = null
-    }
-
-    DisposableEffect(question.id) {
-        onDispose {
-            voiceHandler.removeCallbacksAndMessages(null)
-            voiceRecognizer?.cancel()
-            voiceRecognizer?.destroy()
-        }
-    }
-
-    val canSave = when (question.answerType) {
-        AnswerType.BOOLEAN -> booleanValue != null || !question.required
-        AnswerType.SINGLE_SELECT -> {
-            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else singleValue != null || !question.required
-        }
-        AnswerType.MULTI_SELECT -> {
-            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else multiValue.isNotEmpty() || !question.required
-        }
-        AnswerType.SCALE -> true
-        else -> textValue.isNotBlank() || !question.required
-    }
-
-    fun saveCurrentAnswer() {
-        val payload = when (question.answerType) {
-            AnswerType.BOOLEAN -> booleanValue?.let(::JsonPrimitive) ?: JsonNull
-            AnswerType.SCALE -> JsonPrimitive(scaleValue.toInt())
-            AnswerType.SINGLE_SELECT -> {
-                if (question.options.isEmpty()) {
-                    textValue.trim().takeIf(String::isNotBlank)?.let(::JsonPrimitive) ?: JsonNull
-                } else {
-                    singleValue?.let(::JsonPrimitive) ?: JsonNull
-                }
-            }
-            AnswerType.MULTI_SELECT -> {
-                if (question.options.isEmpty()) {
-                    JsonArray(splitVoiceListItems(textValue).map(::JsonPrimitive))
-                } else {
-                    JsonArray(multiValue.distinct().map(::JsonPrimitive))
-                }
-            }
-            AnswerType.NUMBER -> textValue.toIntOrNull()?.let(::JsonPrimitive) ?: JsonPrimitive(textValue)
-            else -> JsonPrimitive(textValue.trim())
-        }
-        onSaveAnswer(question.id, payload)
+    fun cancelVoicePreviewJob() {
+        voicePreviewJob?.cancel()
+        voicePreviewJob = null
     }
 
     fun applyVoiceTranscript(
@@ -591,6 +582,20 @@ private fun QuestionEditorCard(
     fun applyCombinedVoiceTranscript(isPartial: Boolean): String? =
         applyVoiceTranscript(mergeVoiceTranscript(voiceSegments, voiceLiveSegment), isPartial = isPartial)
 
+    fun applyRecognizedTranscript(
+        transcript: String,
+        isPartial: Boolean,
+    ) {
+        voiceLiveSegment = ""
+        voiceSegments.clear()
+        transcript.trim().takeIf(String::isNotBlank)?.let(voiceSegments::add)
+        voiceError = if (transcript.isBlank()) {
+            if (isPartial) null else voiceEmptyResult
+        } else {
+            applyVoiceTranscript(transcript, isPartial = isPartial)
+        }
+    }
+
     fun updateVoiceTranscriptManually(value: String) {
         voiceLiveSegment = ""
         voiceSegments.clear()
@@ -598,17 +603,190 @@ private fun QuestionEditorCard(
         voiceError = if (value.isBlank()) null else applyCombinedVoiceTranscript(isPartial = false)
     }
 
+    fun destroyVoiceRecognizer() {
+        voiceHandler.removeCallbacksAndMessages(null)
+        voiceRecognizer?.cancel()
+        voiceRecognizer?.destroy()
+        voiceRecognizer = null
+    }
+
+    DisposableEffect(question.id) {
+        onDispose {
+            cancelVoicePreviewJob()
+            voiceHandler.removeCallbacksAndMessages(null)
+            voiceRecognizer?.cancel()
+            voiceRecognizer?.destroy()
+            if (voiceSessionActive && activeVoiceQuestionId == question.id) {
+                scope.launch {
+                    audioRecorder.stop()
+                }
+                onActiveVoiceQuestionChanged(null)
+            }
+        }
+    }
+
+    LaunchedEffect(activeVoiceQuestionId) {
+        if (voiceSessionActive && activeVoiceQuestionId != null && activeVoiceQuestionId != question.id) {
+            cancelVoicePreviewJob()
+            val audioPath = voiceAudioPath
+            voiceSessionActive = false
+            voiceListening = false
+            voiceStopRequested = true
+            voiceAudioPath = null
+            runCatching { audioRecorder.stop().getOrNull() ?: audioPath }
+                .getOrNull()
+                ?.let { finalPath ->
+                    if (finalPath.isNotBlank()) {
+                        cloudSpeechRecognizerEngine.transcribeAudio(finalPath, voiceLanguageTag).fold(
+                            onSuccess = { transcript ->
+                                applyRecognizedTranscript(
+                                    transcript = transcript.transcriptText?.trim().orEmpty(),
+                                    isPartial = false,
+                                )
+                            },
+                            onFailure = { error ->
+                                voiceError = error.message ?: voiceUnavailable
+                            },
+                        )
+                    }
+                }
+        }
+    }
+
+    val canSave = when (question.answerType) {
+        AnswerType.BOOLEAN -> booleanValue != null || !question.required
+        AnswerType.SINGLE_SELECT -> {
+            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else singleValue != null || !question.required
+        }
+        AnswerType.MULTI_SELECT -> {
+            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else multiValue.isNotEmpty() || !question.required
+        }
+        AnswerType.SCALE -> true
+        else -> textValue.isNotBlank() || !question.required
+    }
+
+    fun saveCurrentAnswer() {
+        val payload = when (question.answerType) {
+            AnswerType.BOOLEAN -> booleanValue?.let(::JsonPrimitive) ?: JsonNull
+            AnswerType.SCALE -> JsonPrimitive(scaleValue.toInt())
+            AnswerType.SINGLE_SELECT -> {
+                if (question.options.isEmpty()) {
+                    textValue.trim().takeIf(String::isNotBlank)?.let(::JsonPrimitive) ?: JsonNull
+                } else {
+                    singleValue?.let(::JsonPrimitive) ?: JsonNull
+                }
+            }
+            AnswerType.MULTI_SELECT -> {
+                if (question.options.isEmpty()) {
+                    JsonArray(splitVoiceListItems(textValue).map(::JsonPrimitive))
+                } else {
+                    JsonArray(multiValue.distinct().map(::JsonPrimitive))
+                }
+            }
+            AnswerType.NUMBER -> textValue.toIntOrNull()?.let(::JsonPrimitive) ?: JsonPrimitive(textValue)
+            else -> JsonPrimitive(textValue.trim())
+        }
+        onSaveAnswer(question.id, payload)
+    }
+
+    suspend fun transcribeQuietVoicePreview(audioPath: String) {
+        val snapshotPath = createQuestionnaireAudioSnapshot(audioPath) ?: return
+        try {
+            cloudSpeechRecognizerEngine.transcribeAudio(snapshotPath, voiceLanguageTag).fold(
+                onSuccess = { transcript ->
+                    if (!voiceSessionActive || voiceAudioPath != audioPath) return@fold
+                    val normalized = transcript.transcriptText?.trim().orEmpty()
+                    if (normalized.isBlank()) return@fold
+                    applyRecognizedTranscript(
+                        transcript = normalized,
+                        isPartial = true,
+                    )
+                },
+                onFailure = { error ->
+                    if (voiceSessionActive && voiceAudioPath == audioPath) {
+                        voiceError = error.message ?: voiceUnavailable
+                    }
+                },
+            )
+        } finally {
+            File(snapshotPath).delete()
+        }
+    }
+
+    suspend fun finalizeQuietVoiceCapture(audioPath: String) {
+        cloudSpeechRecognizerEngine.transcribeAudio(audioPath, voiceLanguageTag).fold(
+            onSuccess = { transcript ->
+                applyRecognizedTranscript(
+                    transcript = transcript.transcriptText?.trim().orEmpty(),
+                    isPartial = false,
+                )
+            },
+            onFailure = { error ->
+                voiceError = error.message ?: voiceUnavailable
+            },
+        )
+    }
+
+    fun requestStopVoiceFill(finalizeTranscript: Boolean) {
+        scope.launch {
+            cancelVoicePreviewJob()
+            voiceStopRequested = true
+            voiceSessionActive = false
+            voiceListening = false
+            voiceReconnectAttempts = 0
+            voiceLiveSegment = ""
+            val currentAudioPath = voiceAudioPath
+            voiceAudioPath = null
+            destroyVoiceRecognizer()
+            val finalAudioPath = runCatching {
+                audioRecorder.stop().getOrNull() ?: currentAudioPath
+            }.getOrNull()
+            onActiveVoiceQuestionChanged(null)
+            if (finalizeTranscript && !finalAudioPath.isNullOrBlank()) {
+                finalizeQuietVoiceCapture(finalAudioPath)
+            }
+        }
+    }
+
     fun stopVoiceFill() {
         voiceStopRequested = true
-        voiceSessionActive = false
-        voiceListening = false
-        voiceReconnectAttempts = 0
-        voiceLiveSegment = ""
-        destroyVoiceRecognizer()
+        requestStopVoiceFill(finalizeTranscript = true)
+    }
+
+    fun startQuietVoiceFill() {
+        scope.launch {
+            cancelVoicePreviewJob()
+            destroyVoiceRecognizer()
+            voiceError = null
+            voiceReconnectAttempts = 0
+            voiceStopRequested = false
+            onActiveVoiceQuestionChanged(question.id)
+            audioRecorder.start("${voiceOwnerId}_${question.id}").fold(
+                onSuccess = { audioPath ->
+                    voiceAudioPath = audioPath
+                    voiceSessionActive = true
+                    voiceListening = true
+                    voicePreviewJob = scope.launch {
+                        delay(3_500)
+                        while (isActive && voiceSessionActive && voiceAudioPath == audioPath) {
+                            transcribeQuietVoicePreview(audioPath)
+                            delay(4_500)
+                        }
+                    }
+                },
+                onFailure = { error ->
+                    voiceSessionActive = false
+                    voiceListening = false
+                    voiceAudioPath = null
+                    onActiveVoiceQuestionChanged(null)
+                    voiceError = error.message ?: voiceUnavailable
+                },
+            )
+        }
     }
 
     fun clearCurrentAnswer() {
-        stopVoiceFill()
+        requestStopVoiceFill(finalizeTranscript = false)
         textValue = ""
         booleanValue = null
         singleValue = null
@@ -616,206 +794,9 @@ private fun QuestionEditorCard(
         scaleValue = 5f
         voiceError = null
         voiceLiveSegment = ""
+        voiceAudioPath = null
         voiceSegments.clear()
         onSaveAnswer(question.id, JsonNull)
-    }
-
-    lateinit var launchVoiceRecognition: () -> Unit
-
-    val scheduleVoiceRestart: (Long) -> Unit = { delayMillis ->
-        voiceHandler.removeCallbacksAndMessages(null)
-        voiceHandler.postDelayed(
-            {
-                if (!voiceSessionActive || voiceStopRequested) return@postDelayed
-                launchVoiceRecognition()
-            },
-            delayMillis,
-        )
-    }
-
-    launchVoiceRecognition = launch@{
-        val useOnDeviceRecognizer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
-        val useSegmentedSession = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        val recognitionAvailable = useOnDeviceRecognizer || SpeechRecognizer.isRecognitionAvailable(context)
-        if (!recognitionAvailable) {
-            voiceSessionActive = false
-            voiceListening = false
-            voiceError = voiceUnavailable
-            return@launch
-        }
-
-        destroyVoiceRecognizer()
-        val recognizer = runCatching {
-            if (useOnDeviceRecognizer) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context)
-            }
-        }.getOrElse {
-            voiceSessionActive = false
-            voiceListening = false
-            voiceError = voiceUnavailable
-            return@launch
-        }
-
-        voiceRecognizer = recognizer
-        voiceSessionActive = true
-        voiceListening = true
-        voiceStopRequested = false
-        voiceError = null
-
-        recognizer.setRecognitionListener(
-            object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    voiceReconnectAttempts = 0
-                    voiceListening = true
-                }
-
-                override fun onBeginningOfSpeech() {
-                    voiceListening = true
-                }
-
-                override fun onRmsChanged(rmsdB: Float) = Unit
-
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                override fun onEndOfSpeech() {
-                    if (!useSegmentedSession) {
-                        voiceListening = false
-                    }
-                }
-
-                override fun onError(error: Int) {
-                    if (voiceStopRequested || error == SpeechRecognizer.ERROR_CLIENT) {
-                        voiceStopRequested = false
-                        voiceSessionActive = false
-                        voiceListening = false
-                        voiceReconnectAttempts = 0
-                        destroyVoiceRecognizer()
-                        return
-                    }
-                    val canRestart =
-                        voiceSessionActive &&
-                            shouldRestartVoiceRecognition(error) &&
-                            (error != SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
-                                voiceReconnectAttempts < MaxVoiceReconnectAttempts)
-                    if (canRestart) {
-                        voiceListening = false
-                        voiceError = null
-                        if (error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
-                            voiceReconnectAttempts += 1
-                        }
-                        destroyVoiceRecognizer()
-                        scheduleVoiceRestart(
-                            if (error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
-                                VoiceReconnectDelayMillis
-                            } else {
-                                VoiceRestartDelayMillis
-                            },
-                        )
-                        return
-                    }
-                    voiceSessionActive = false
-                    voiceListening = false
-                    voiceReconnectAttempts = 0
-                    voiceLiveSegment = ""
-                    voiceError = mapVoiceRecognitionError(
-                        errorCode = error,
-                        unavailableLabel = voiceUnavailable,
-                        emptyResultLabel = voiceEmptyResult,
-                        disconnectedLabel = voiceDisconnected,
-                        errorCodeLabel = voiceErrorCode,
-                    )
-                    destroyVoiceRecognizer()
-                }
-
-                override fun onResults(results: Bundle?) {
-                    val transcript = extractVoiceTranscript(results)
-                    voiceReconnectAttempts = 0
-                    voiceLiveSegment = ""
-                    if (transcript.isNotBlank()) {
-                        val updatedSegments = mergeVoiceSegments(voiceSegments, transcript)
-                        voiceSegments.clear()
-                        voiceSegments.addAll(updatedSegments)
-                    }
-                    voiceError = applyCombinedVoiceTranscript(isPartial = false)
-                    if (useSegmentedSession) {
-                        voiceListening = false
-                        return
-                    }
-                    if (voiceSessionActive && !voiceStopRequested) {
-                        voiceListening = false
-                        destroyVoiceRecognizer()
-                        scheduleVoiceRestart(VoiceRestartDelayMillis)
-                    } else {
-                        voiceSessionActive = false
-                        voiceListening = false
-                        voiceReconnectAttempts = 0
-                        destroyVoiceRecognizer()
-                    }
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    voiceLiveSegment = extractVoiceTranscript(partialResults)
-                    voiceError = applyCombinedVoiceTranscript(isPartial = true)
-                }
-
-                override fun onSegmentResults(segmentResults: Bundle) {
-                    val transcript = extractVoiceTranscript(segmentResults)
-                    voiceReconnectAttempts = 0
-                    voiceLiveSegment = ""
-                    if (transcript.isNotBlank()) {
-                        val updatedSegments = mergeVoiceSegments(voiceSegments, transcript)
-                        voiceSegments.clear()
-                        voiceSegments.addAll(updatedSegments)
-                    }
-                    voiceError = applyCombinedVoiceTranscript(isPartial = false)
-                    voiceListening = true
-                }
-
-                override fun onEndOfSegmentedSession() {
-                    if (voiceSessionActive && !voiceStopRequested) {
-                        voiceListening = false
-                        destroyVoiceRecognizer()
-                        scheduleVoiceRestart(VoiceReconnectDelayMillis)
-                    } else {
-                        voiceSessionActive = false
-                        voiceListening = false
-                        voiceReconnectAttempts = 0
-                        destroyVoiceRecognizer()
-                    }
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            },
-        )
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguageTag)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, voiceLanguageTag)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, useOnDeviceRecognizer)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_400L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_600L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 45_000L)
-            if (useSegmentedSession) {
-                putExtra(
-                    RecognizerIntent.EXTRA_SEGMENTED_SESSION,
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                )
-            }
-        }
-
-        runCatching { recognizer.startListening(intent) }
-            .onFailure {
-                voiceSessionActive = false
-                voiceListening = false
-                voiceError = voiceUnavailable
-                destroyVoiceRecognizer()
-            }
     }
 
     val voicePermissionLauncher = rememberLauncherForActivityResult(
@@ -824,7 +805,7 @@ private fun QuestionEditorCard(
         if (granted) {
             voiceError = null
             voiceStopRequested = false
-            launchVoiceRecognition()
+            startQuietVoiceFill()
         } else {
             voiceError = voicePermissionRequired
         }
@@ -841,7 +822,7 @@ private fun QuestionEditorCard(
             voiceError = null
             voiceReconnectAttempts = 0
             voiceStopRequested = false
-            launchVoiceRecognition()
+            startQuietVoiceFill()
         } else {
             voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -1312,6 +1293,26 @@ private fun mergeVoiceSegments(
         .map(String::trim)
         .filter(String::isNotBlank)
         .takeLast(8)
+}
+
+private fun createQuestionnaireAudioSnapshot(sourcePath: String): String? {
+    val source = File(sourcePath)
+    if (!source.exists() || source.length() <= 44L) return null
+    val target = File.createTempFile("question-voice-preview-", ".wav", source.parentFile)
+    source.copyTo(target, overwrite = true)
+    repairQuestionnaireWavHeader(target)
+    return target.absolutePath
+}
+
+private fun repairQuestionnaireWavHeader(file: File) {
+    RandomAccessFile(file, "rw").use { raf ->
+        val fileLength = raf.length().toInt()
+        if (fileLength <= 44) return
+        raf.seek(4)
+        raf.writeInt(Integer.reverseBytes(fileLength - 8))
+        raf.seek(40)
+        raf.writeInt(Integer.reverseBytes(fileLength - 44))
+    }
 }
 
 private fun shouldRestartVoiceRecognition(errorCode: Int): Boolean = when (errorCode) {
