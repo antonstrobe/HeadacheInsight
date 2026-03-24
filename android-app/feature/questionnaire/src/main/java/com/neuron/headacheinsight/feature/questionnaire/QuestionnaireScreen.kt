@@ -1,5 +1,13 @@
 package com.neuron.headacheinsight.feature.questionnaire
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -30,9 +38,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +65,7 @@ import com.neuron.headacheinsight.domain.ObserveQuestionSetUseCase
 import com.neuron.headacheinsight.domain.SaveQuestionAnswerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import java.util.Locale
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -182,6 +193,10 @@ fun QuestionnaireScreen(
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
+    val voiceLanguageTag = state.episodeDetail?.episode?.locale
+        ?.takeIf(String::isNotBlank)
+        ?: Locale.getDefault().toLanguageTag()
+
     androidx.compose.material3.Scaffold(
         bottomBar = {
             Surface {
@@ -287,6 +302,7 @@ fun QuestionnaireScreen(
             items(state.questions, key = { it.id }) { question ->
                 QuestionEditorCard(
                     question = question,
+                    voiceLanguageTag = voiceLanguageTag,
                     onSaveAnswer = onSaveAnswer,
                 )
             }
@@ -342,18 +358,34 @@ private fun AnalysisSummaryCard(
 @Composable
 private fun QuestionEditorCard(
     question: QuestionTemplate,
+    voiceLanguageTag: String,
     onSaveAnswer: (String, JsonElement) -> Unit,
 ) {
+    val context = LocalContext.current
     var textValue by remember(question.id) { mutableStateOf("") }
     var booleanValue by remember(question.id) { mutableStateOf<Boolean?>(null) }
     var singleValue by remember(question.id) { mutableStateOf<String?>(null) }
     val multiValue = remember(question.id) { mutableStateListOf<String>() }
     var scaleValue by remember(question.id) { mutableStateOf(5f) }
+    var voiceError by remember(question.id) { mutableStateOf<String?>(null) }
+
+    val voiceFillLabel = stringResource(R.string.questionnaire_voice_fill)
+    val voicePermissionRequired = stringResource(R.string.questionnaire_voice_permission_required)
+    val voiceUnavailable = stringResource(R.string.questionnaire_voice_unavailable)
+    val voiceEmptyResult = stringResource(R.string.questionnaire_voice_empty_result)
+    val voiceBooleanError = stringResource(R.string.questionnaire_voice_boolean_error)
+    val voiceOptionError = stringResource(R.string.questionnaire_voice_option_error)
+    val voiceNumberError = stringResource(R.string.questionnaire_voice_number_error)
+    val voiceScaleError = stringResource(R.string.questionnaire_voice_scale_error)
 
     val canSave = when (question.answerType) {
         AnswerType.BOOLEAN -> booleanValue != null || !question.required
-        AnswerType.SINGLE_SELECT -> singleValue != null || !question.required
-        AnswerType.MULTI_SELECT -> multiValue.isNotEmpty() || !question.required
+        AnswerType.SINGLE_SELECT -> {
+            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else singleValue != null || !question.required
+        }
+        AnswerType.MULTI_SELECT -> {
+            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else multiValue.isNotEmpty() || !question.required
+        }
         AnswerType.SCALE -> true
         else -> textValue.isNotBlank() || !question.required
     }
@@ -362,12 +394,151 @@ private fun QuestionEditorCard(
         val payload = when (question.answerType) {
             AnswerType.BOOLEAN -> booleanValue?.let(::JsonPrimitive) ?: JsonNull
             AnswerType.SCALE -> JsonPrimitive(scaleValue.toInt())
-            AnswerType.SINGLE_SELECT -> singleValue?.let(::JsonPrimitive) ?: JsonNull
-            AnswerType.MULTI_SELECT -> JsonArray(multiValue.distinct().map(::JsonPrimitive))
+            AnswerType.SINGLE_SELECT -> {
+                if (question.options.isEmpty()) {
+                    textValue.trim().takeIf(String::isNotBlank)?.let(::JsonPrimitive) ?: JsonNull
+                } else {
+                    singleValue?.let(::JsonPrimitive) ?: JsonNull
+                }
+            }
+            AnswerType.MULTI_SELECT -> {
+                if (question.options.isEmpty()) {
+                    JsonArray(splitVoiceListItems(textValue).map(::JsonPrimitive))
+                } else {
+                    JsonArray(multiValue.distinct().map(::JsonPrimitive))
+                }
+            }
             AnswerType.NUMBER -> textValue.toIntOrNull()?.let(::JsonPrimitive) ?: JsonPrimitive(textValue)
             else -> JsonPrimitive(textValue.trim())
         }
         onSaveAnswer(question.id, payload)
+    }
+
+    fun applyVoiceTranscript(rawTranscript: String): String? {
+        val transcript = rawTranscript.trim()
+        if (transcript.isBlank()) return voiceEmptyResult
+
+        return when (question.answerType) {
+            AnswerType.BOOLEAN -> {
+                val parsed = parseBooleanVoiceAnswer(transcript)
+                if (parsed == null) {
+                    voiceBooleanError
+                } else {
+                    booleanValue = parsed
+                    null
+                }
+            }
+
+            AnswerType.SCALE -> {
+                val parsed = parseIntegerVoiceAnswer(transcript)?.takeIf { it in 0..10 }
+                if (parsed == null) {
+                    voiceScaleError
+                } else {
+                    scaleValue = parsed.toFloat()
+                    null
+                }
+            }
+
+            AnswerType.SINGLE_SELECT -> {
+                if (question.options.isEmpty()) {
+                    textValue = transcript
+                    singleValue = transcript
+                    null
+                } else {
+                    val matched = matchSingleVoiceOption(transcript, question.options)
+                    if (matched == null) {
+                        voiceOptionError
+                    } else {
+                        singleValue = matched
+                        null
+                    }
+                }
+            }
+
+            AnswerType.MULTI_SELECT -> {
+                if (question.options.isEmpty()) {
+                    textValue = transcript
+                    null
+                } else {
+                    val matched = matchMultiVoiceOptions(transcript, question.options)
+                    if (matched.isEmpty()) {
+                        voiceOptionError
+                    } else {
+                        multiValue.clear()
+                        multiValue.addAll(matched)
+                        null
+                    }
+                }
+            }
+
+            AnswerType.NUMBER -> {
+                val parsed = parseIntegerVoiceAnswer(transcript)
+                textValue = parsed?.toString() ?: transcript
+                if (parsed == null && transcript.none(Char::isDigit)) {
+                    voiceNumberError
+                } else {
+                    null
+                }
+            }
+
+            else -> {
+                textValue = transcript
+                null
+            }
+        }
+    }
+
+    val voiceRecognitionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val transcript = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            .orEmpty()
+        voiceError = applyVoiceTranscript(transcript)
+    }
+
+    fun launchVoiceRecognition() {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            voiceError = voiceUnavailable
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguageTag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, voiceLanguageTag)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, question.prompt)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        if (intent.resolveActivity(context.packageManager) == null) {
+            voiceError = voiceUnavailable
+            return
+        }
+        runCatching { voiceRecognitionLauncher.launch(intent) }
+            .onFailure { voiceError = voiceUnavailable }
+    }
+
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            voiceError = null
+            launchVoiceRecognition()
+        } else {
+            voiceError = voicePermissionRequired
+        }
+    }
+
+    fun startVoiceFill() {
+        val hasPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            voiceError = null
+            launchVoiceRecognition()
+        } else {
+            voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     HeadacheInsightSectionCard(
@@ -412,7 +583,10 @@ private fun QuestionEditorCard(
                         stringResource(R.string.questionnaire_no) to false,
                     ),
                     selected = booleanValue,
-                    onSelect = { booleanValue = it },
+                    onSelect = {
+                        booleanValue = it
+                        voiceError = null
+                    },
                 )
             }
 
@@ -420,7 +594,10 @@ private fun QuestionEditorCard(
                 Text(stringResource(R.string.questionnaire_scale_value, scaleValue.toInt()))
                 Slider(
                     value = scaleValue,
-                    onValueChange = { scaleValue = it },
+                    onValueChange = {
+                        scaleValue = it
+                        voiceError = null
+                    },
                     valueRange = 0f..10f,
                     steps = 9,
                 )
@@ -430,7 +607,11 @@ private fun QuestionEditorCard(
                 if (question.options.isEmpty()) {
                     OutlinedTextField(
                         value = textValue,
-                        onValueChange = { textValue = it },
+                        onValueChange = {
+                            textValue = it
+                            singleValue = it.takeIf(String::isNotBlank)
+                            voiceError = null
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.questionnaire_answer_label)) },
                     )
@@ -442,7 +623,10 @@ private fun QuestionEditorCard(
                         question.options.forEach { option ->
                             FilterChip(
                                 selected = singleValue == option,
-                                onClick = { singleValue = option },
+                                onClick = {
+                                    singleValue = option
+                                    voiceError = null
+                                },
                                 label = { Text(option) },
                             )
                         }
@@ -454,7 +638,10 @@ private fun QuestionEditorCard(
                 if (question.options.isEmpty()) {
                     OutlinedTextField(
                         value = textValue,
-                        onValueChange = { textValue = it },
+                        onValueChange = {
+                            textValue = it
+                            voiceError = null
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.questionnaire_answer_label)) },
                     )
@@ -473,6 +660,7 @@ private fun QuestionEditorCard(
                                     } else {
                                         multiValue.add(option)
                                     }
+                                    voiceError = null
                                 },
                                 label = { Text(option) },
                             )
@@ -484,7 +672,10 @@ private fun QuestionEditorCard(
             AnswerType.NUMBER -> {
                 OutlinedTextField(
                     value = textValue,
-                    onValueChange = { textValue = it },
+                    onValueChange = {
+                        textValue = it
+                        voiceError = null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.questionnaire_number_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -494,7 +685,10 @@ private fun QuestionEditorCard(
             else -> {
                 OutlinedTextField(
                     value = textValue,
-                    onValueChange = { textValue = it },
+                    onValueChange = {
+                        textValue = it
+                        voiceError = null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(question.helpText ?: stringResource(R.string.questionnaire_answer_label)) },
                     minLines = if (question.answerType == AnswerType.FREE_TEXT || question.answerType == AnswerType.MEDICATION_LIST) 3 else 1,
@@ -509,7 +703,22 @@ private fun QuestionEditorCard(
             }
         }
 
+        voiceError?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
         SectionActionRow {
+            if (question.voiceAllowed) {
+                TextButton(
+                    onClick = ::startVoiceFill,
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    Text(voiceFillLabel)
+                }
+            }
             TextButton(onClick = { saveCurrentAnswer() }, enabled = canSave) {
                 Text(stringResource(R.string.questionnaire_save))
             }
@@ -536,3 +745,135 @@ private fun ChoiceChipRow(
         }
     }
 }
+
+private val SpokenVoiceNumbers = mapOf(
+    "zero" to 0,
+    "one" to 1,
+    "two" to 2,
+    "three" to 3,
+    "four" to 4,
+    "five" to 5,
+    "six" to 6,
+    "seven" to 7,
+    "eight" to 8,
+    "nine" to 9,
+    "ten" to 10,
+    "none" to 0,
+    "ноль" to 0,
+    "один" to 1,
+    "одна" to 1,
+    "одно" to 1,
+    "два" to 2,
+    "две" to 2,
+    "три" to 3,
+    "четыре" to 4,
+    "пять" to 5,
+    "шесть" to 6,
+    "семь" to 7,
+    "восемь" to 8,
+    "девять" to 9,
+    "десять" to 10,
+)
+
+private val VoiceTrueWords = setOf(
+    "yes",
+    "yeah",
+    "yep",
+    "true",
+    "да",
+    "ага",
+    "есть",
+    "было",
+    "была",
+    "был",
+)
+
+private val VoiceFalseWords = setOf(
+    "no",
+    "nope",
+    "false",
+    "нет",
+    "не",
+    "отсутствует",
+)
+
+private fun parseBooleanVoiceAnswer(transcript: String): Boolean? {
+    val normalized = normalizeVoiceText(transcript)
+    if (normalized.isBlank()) return null
+    if (normalized in VoiceTrueWords) return true
+    if (normalized in VoiceFalseWords) return false
+
+    val tokens = normalized.split(' ').filter(String::isNotBlank).toSet()
+    return when {
+        tokens.any(VoiceTrueWords::contains) -> true
+        tokens.any { it == "нет" || it == "no" || it == "false" } -> false
+        normalized.startsWith("не ") || normalized.startsWith("not ") -> false
+        else -> null
+    }
+}
+
+private fun parseIntegerVoiceAnswer(transcript: String): Int? {
+    Regex("""-?\d+""").find(transcript)?.value?.toIntOrNull()?.let { return it }
+    val tokens = normalizeVoiceText(transcript).split(' ').filter(String::isNotBlank)
+    return tokens.firstNotNullOfOrNull(SpokenVoiceNumbers::get)
+}
+
+private fun matchSingleVoiceOption(
+    transcript: String,
+    options: List<String>,
+): String? {
+    val spokenIndex = parseIntegerVoiceAnswer(transcript)
+    if (spokenIndex != null && spokenIndex in 1..options.size) {
+        return options[spokenIndex - 1]
+    }
+
+    val normalizedTranscript = normalizeVoiceText(transcript)
+    val transcriptTokens = normalizedTranscript.split(' ').filter(String::isNotBlank).toSet()
+    val scoredMatches = options
+        .map { option -> option to scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option) }
+        .filter { (_, score) -> score > 0 }
+    val best = scoredMatches.maxByOrNull { (_, score) -> score } ?: return null
+    val bestScore = best.second
+    if (bestScore < 2 && scoredMatches.count { (_, score) -> score == bestScore } > 1) {
+        return null
+    }
+    return best.first
+}
+
+private fun matchMultiVoiceOptions(
+    transcript: String,
+    options: List<String>,
+): List<String> {
+    val normalizedTranscript = normalizeVoiceText(transcript)
+    val transcriptTokens = normalizedTranscript.split(' ').filter(String::isNotBlank).toSet()
+    return options.filter { option ->
+        scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option) > 0
+    }
+}
+
+private fun scoreVoiceOptionMatch(
+    normalizedTranscript: String,
+    transcriptTokens: Set<String>,
+    option: String,
+): Int {
+    val normalizedOption = normalizeVoiceText(option)
+    if (normalizedOption.isBlank()) return 0
+    if (normalizedTranscript == normalizedOption) return 4
+    if (normalizedTranscript.contains(normalizedOption)) return 3
+    if (normalizedOption.contains(normalizedTranscript)) return 2
+    val optionTokens = normalizedOption.split(' ').filter(String::isNotBlank)
+    return if (optionTokens.isNotEmpty() && optionTokens.all(transcriptTokens::contains)) 1 else 0
+}
+
+private fun normalizeVoiceText(value: String): String =
+    value
+        .lowercase(Locale.ROOT)
+        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        .trim()
+
+private fun splitVoiceListItems(value: String): List<String> =
+    value
+        .split('\n', ',', ';')
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()

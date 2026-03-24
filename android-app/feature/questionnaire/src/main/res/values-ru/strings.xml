@@ -23,4 +23,12 @@
     <string name="questionnaire_no">Нет</string>
     <string name="questionnaire_scale_value">Значение: %1$d</string>
     <string name="questionnaire_number_label">Число</string>
+    <string name="questionnaire_voice_fill">Заполнить голосом</string>
+    <string name="questionnaire_voice_permission_required">Для голосового заполнения нужен доступ к микрофону.</string>
+    <string name="questionnaire_voice_unavailable">Голосовое заполнение сейчас недоступно на этом устройстве.</string>
+    <string name="questionnaire_voice_empty_result">Речь не распознана. Попробуйте ещё раз.</string>
+    <string name="questionnaire_voice_boolean_error">Не удалось понять, это ответ «да» или «нет».</string>
+    <string name="questionnaire_voice_option_error">Не удалось сопоставить фразу с вариантами ответа.</string>
+    <string name="questionnaire_voice_number_error">Фраза вставлена, но число распознано неточно.</string>
+    <string name="questionnaire_voice_scale_error">Не удалось определить значение от 0 до 10.</string>
 </resources>
