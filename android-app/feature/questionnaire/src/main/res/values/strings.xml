@@ -36,4 +36,9 @@
     <string name="questionnaire_voice_number_error">Speech was inserted, but the number was not recognized exactly.</string>
     <string name="questionnaire_voice_scale_error">Could not determine a value from 0 to 10.</string>
     <string name="questionnaire_voice_error_code">Voice recognition error (code %1$d).</string>
+    <string name="questionnaire_clear">Delete</string>
+    <string name="questionnaire_clear_confirm_title">Delete answer?</string>
+    <string name="questionnaire_clear_confirm_message">Are you sure you want to delete the answer for this question?</string>
+    <string name="questionnaire_clear_confirm_yes">Yes, delete</string>
+    <string name="questionnaire_clear_confirm_cancel">Cancel</string>
 </resources>

@@ -22,9 +22,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -33,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +44,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -392,6 +393,7 @@ private fun QuestionEditorCard(
     var voiceStopRequested by remember(question.id) { mutableStateOf(false) }
     var voiceRecognizer by remember(question.id) { mutableStateOf<SpeechRecognizer?>(null) }
     var voiceLiveSegment by remember(question.id) { mutableStateOf("") }
+    var showClearConfirmation by remember(question.id) { mutableStateOf(false) }
     val voiceSegments = remember(question.id) { mutableStateListOf<String>() }
     val voiceHandler = remember(question.id) { Handler(Looper.getMainLooper()) }
 
@@ -408,6 +410,11 @@ private fun QuestionEditorCard(
     val voiceNumberError = stringResource(R.string.questionnaire_voice_number_error)
     val voiceScaleError = stringResource(R.string.questionnaire_voice_scale_error)
     val voiceErrorCode = stringResource(R.string.questionnaire_voice_error_code)
+    val clearLabel = stringResource(R.string.questionnaire_clear)
+    val clearConfirmTitle = stringResource(R.string.questionnaire_clear_confirm_title)
+    val clearConfirmMessage = stringResource(R.string.questionnaire_clear_confirm_message)
+    val clearConfirmYes = stringResource(R.string.questionnaire_clear_confirm_yes)
+    val clearConfirmCancel = stringResource(R.string.questionnaire_clear_confirm_cancel)
     val optionLabels = remember(question.options, voiceLanguageTag) {
         question.options.associateWith { option -> localizedQuestionOptionLabel(option, voiceLanguageTag) }
     }
@@ -441,6 +448,14 @@ private fun QuestionEditorCard(
         HeadacheInsightStatusColors.Emergency.copy(alpha = 0.9f),
         voicePulseProgress,
     )
+    val hasClearableAnswer =
+        textValue.isNotBlank() ||
+            booleanValue != null ||
+            singleValue != null ||
+            multiValue.isNotEmpty() ||
+            scaleValue.toInt() != 5 ||
+            voiceTranscriptText.isNotBlank() ||
+            voiceSessionActive
     val actionButtonModifier = Modifier
         .widthIn(min = 124.dp)
         .defaultMinSize(minHeight = 48.dp)
@@ -590,6 +605,19 @@ private fun QuestionEditorCard(
         voiceReconnectAttempts = 0
         voiceLiveSegment = ""
         destroyVoiceRecognizer()
+    }
+
+    fun clearCurrentAnswer() {
+        stopVoiceFill()
+        textValue = ""
+        booleanValue = null
+        singleValue = null
+        multiValue.clear()
+        scaleValue = 5f
+        voiceError = null
+        voiceLiveSegment = ""
+        voiceSegments.clear()
+        onSaveAnswer(question.id, JsonNull)
     }
 
     lateinit var launchVoiceRecognition: () -> Unit
@@ -819,10 +847,42 @@ private fun QuestionEditorCard(
         }
     }
 
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text(clearConfirmTitle) },
+            text = { Text(clearConfirmMessage) },
+            confirmButton = {
+                Button(onClick = { showClearConfirmation = false }) {
+                    Text(clearConfirmCancel)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirmation = false
+                        clearCurrentAnswer()
+                    },
+                ) {
+                    Text(clearConfirmYes, color = MaterialTheme.colorScheme.error)
+                }
+            },
+        )
+    }
+
     HeadacheInsightSectionCard(
         title = question.shortLabel,
         supportingText = question.prompt,
     ) {
+        SectionActionRow {
+            TextButton(
+                onClick = { showClearConfirmation = true },
+                enabled = hasClearableAnswer,
+            ) {
+                Text(clearLabel)
+            }
+        }
+
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

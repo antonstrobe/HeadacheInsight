@@ -36,4 +36,9 @@
     <string name="questionnaire_voice_number_error">Фраза вставлена, но число распознано неточно.</string>
     <string name="questionnaire_voice_scale_error">Не удалось определить значение от 0 до 10.</string>
     <string name="questionnaire_voice_error_code">Ошибка распознавания речи (код %1$d).</string>
+    <string name="questionnaire_clear">Удалить</string>
+    <string name="questionnaire_clear_confirm_title">Удалить ответ?</string>
+    <string name="questionnaire_clear_confirm_message">Вы точно хотите удалить ответ на этот вопрос?</string>
+    <string name="questionnaire_clear_confirm_yes">Да, удалить</string>
+    <string name="questionnaire_clear_confirm_cancel">Отмена</string>
 </resources>
