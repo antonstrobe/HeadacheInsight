@@ -45,6 +45,10 @@ interface CloudCredentialsRepository {
     suspend fun saveCredentials(credentials: CloudCredentials)
 }
 
+interface OpenAiModelRepository {
+    suspend fun listModels(apiKey: String): Result<List<String>>
+}
+
 interface EpisodeRepository {
     fun observeEpisodes(): Flow<List<Episode>>
     fun observeActiveEpisode(): Flow<Episode?>

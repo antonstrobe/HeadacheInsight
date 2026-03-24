@@ -30,7 +30,7 @@ class OpenAiAuthInterceptor @Inject constructor(
         val builder = chain.request().newBuilder()
             .header("Accept", "application/json")
 
-        if (credentials.apiKey.isNotBlank()) {
+        if (credentials.apiKey.isNotBlank() && chain.request().header("Authorization").isNullOrBlank()) {
             builder.header("Authorization", "Bearer ${credentials.apiKey}")
         }
 

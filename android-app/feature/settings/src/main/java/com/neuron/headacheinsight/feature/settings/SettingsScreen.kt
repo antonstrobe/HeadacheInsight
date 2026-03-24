@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -40,9 +44,13 @@ import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.BackendStatusRepository
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
+import com.neuron.headacheinsight.domain.OpenAiModelRepository
 import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,9 +65,22 @@ enum class ConnectionCheckState {
     ERROR,
 }
 
+enum class ModelCatalogState {
+    IDLE,
+    LOADING,
+    READY,
+    ERROR,
+}
+
 private data class ConnectionUiState(
     val state: ConnectionCheckState = ConnectionCheckState.IDLE,
     val status: BackendConnectionStatus? = null,
+    val errorMessage: String? = null,
+)
+
+private data class ModelCatalogUiState(
+    val state: ModelCatalogState = ModelCatalogState.IDLE,
+    val availableModels: List<String> = emptyList(),
     val errorMessage: String? = null,
 )
 
@@ -69,6 +90,9 @@ data class SettingsUiState(
     val connectionState: ConnectionCheckState = ConnectionCheckState.IDLE,
     val connectionStatus: BackendConnectionStatus? = null,
     val connectionErrorMessage: String? = null,
+    val availableModels: List<String> = emptyList(),
+    val modelCatalogState: ModelCatalogState = ModelCatalogState.IDLE,
+    val modelCatalogErrorMessage: String? = null,
 )
 
 @HiltViewModel
@@ -76,22 +100,43 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val backendStatusRepository: BackendStatusRepository,
+    private val openAiModelRepository: OpenAiModelRepository,
 ) : androidx.lifecycle.ViewModel() {
     private val connectionState = MutableStateFlow(ConnectionUiState())
+    private val modelCatalogState = MutableStateFlow(ModelCatalogUiState())
+
+    init {
+        viewModelScope.launch {
+            cloudCredentialsRepository.observeCredentials()
+                .map { it.apiKey.trim() }
+                .distinctUntilChanged()
+                .collectLatest(::loadAvailableModels)
+        }
+    }
 
     val state: StateFlow<SettingsUiState> = combine(
         settingsRepository.observeSettings(),
         cloudCredentialsRepository.observeCredentials(),
         connectionState,
-    ) { settings, cloudCredentials, connection ->
+        modelCatalogState,
+    ) { settings, cloudCredentials, connection, models ->
         SettingsUiState(
             appSettings = settings,
             cloudCredentials = cloudCredentials,
             connectionState = connection.state,
             connectionStatus = connection.status,
             connectionErrorMessage = connection.errorMessage,
+            availableModels = models.availableModels,
+            modelCatalogState = models.state,
+            modelCatalogErrorMessage = models.errorMessage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    fun refreshAvailableModels(apiKey: String) {
+        viewModelScope.launch {
+            loadAvailableModels(apiKey)
+        }
+    }
 
     fun save(
         languageTag: String,
@@ -152,6 +197,41 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private suspend fun loadAvailableModels(apiKey: String) {
+        val normalizedApiKey = apiKey.trim()
+        if (normalizedApiKey.isBlank()) {
+            modelCatalogState.emit(ModelCatalogUiState())
+            return
+        }
+
+        val existingModels = modelCatalogState.value.availableModels
+        modelCatalogState.emit(
+            ModelCatalogUiState(
+                state = ModelCatalogState.LOADING,
+                availableModels = existingModels,
+            ),
+        )
+        openAiModelRepository.listModels(normalizedApiKey).fold(
+            onSuccess = { models ->
+                modelCatalogState.emit(
+                    ModelCatalogUiState(
+                        state = ModelCatalogState.READY,
+                        availableModels = models,
+                    ),
+                )
+            },
+            onFailure = { error ->
+                modelCatalogState.emit(
+                    ModelCatalogUiState(
+                        state = ModelCatalogState.ERROR,
+                        availableModels = existingModels,
+                        errorMessage = error.message,
+                    ),
+                )
+            },
+        )
+    }
+
     private suspend fun persistSettings(
         languageTag: String,
         handPreference: HandPreference,
@@ -192,6 +272,7 @@ fun SettingsRoute(
         state = state,
         onSave = viewModel::save,
         onSaveAndTest = viewModel::saveAndTest,
+        onRefreshAvailableModels = viewModel::refreshAvailableModels,
         onBack = onBack,
         onHome = onHome,
     )
@@ -202,6 +283,7 @@ fun SettingsScreen(
     state: SettingsUiState,
     onSave: (String, HandPreference, String, String, String, String) -> Unit,
     onSaveAndTest: (String, HandPreference, String, String, String, String) -> Unit,
+    onRefreshAvailableModels: (String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
@@ -282,29 +364,42 @@ fun SettingsScreen(
             title = stringResource(R.string.settings_models_title),
             supportingText = stringResource(R.string.settings_models_subtitle),
         ) {
-            OutlinedTextField(
-                value = analysisModelState,
-                onValueChange = { analysisModelState = it },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
-                label = { Text(stringResource(R.string.settings_analysis_model_label)) },
-                singleLine = true,
+            ModelCatalogStatusBlock(
+                state = state.modelCatalogState,
+                availableModelsCount = state.availableModels.size,
+                errorMessage = state.modelCatalogErrorMessage,
             )
-            OutlinedTextField(
-                value = questionModelState,
-                onValueChange = { questionModelState = it },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
-                label = { Text(stringResource(R.string.settings_question_model_label)) },
-                singleLine = true,
+            SectionActionRow {
+                TextButton(
+                    onClick = { onRefreshAvailableModels(apiKeyState) },
+                    enabled = apiKeyState.isNotBlank() && state.modelCatalogState != ModelCatalogState.LOADING,
+                ) {
+                    Text(
+                        if (state.modelCatalogState == ModelCatalogState.LOADING) {
+                            stringResource(R.string.settings_models_loading)
+                        } else {
+                            stringResource(R.string.settings_models_refresh)
+                        },
+                    )
+                }
+            }
+            ModelDropdownField(
+                label = stringResource(R.string.settings_analysis_model_label),
+                selectedModel = analysisModelState,
+                availableModels = state.availableModels,
+                onModelSelected = { analysisModelState = it },
             )
-            OutlinedTextField(
-                value = transcribeModelState,
-                onValueChange = { transcribeModelState = it },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
-                label = { Text(stringResource(R.string.settings_transcribe_model_label)) },
-                singleLine = true,
+            ModelDropdownField(
+                label = stringResource(R.string.settings_question_model_label),
+                selectedModel = questionModelState,
+                availableModels = state.availableModels,
+                onModelSelected = { questionModelState = it },
+            )
+            ModelDropdownField(
+                label = stringResource(R.string.settings_transcribe_model_label),
+                selectedModel = transcribeModelState,
+                availableModels = state.availableModels,
+                onModelSelected = { transcribeModelState = it },
             )
         }
 
@@ -365,6 +460,128 @@ fun SettingsScreen(
         )
     }
 }
+
+@Composable
+private fun ModelCatalogStatusBlock(
+    state: ModelCatalogState,
+    availableModelsCount: Int,
+    errorMessage: String?,
+) {
+    val badgeColor = when (state) {
+        ModelCatalogState.READY -> HeadacheInsightStatusColors.LocalComplete
+        ModelCatalogState.ERROR -> HeadacheInsightStatusColors.Warning
+        ModelCatalogState.LOADING -> HeadacheInsightStatusColors.CloudAnalyzed
+        ModelCatalogState.IDLE -> HeadacheInsightStatusColors.Queued
+    }
+    val badgeLabel = when (state) {
+        ModelCatalogState.READY -> stringResource(R.string.settings_models_ready)
+        ModelCatalogState.ERROR -> stringResource(R.string.settings_models_error)
+        ModelCatalogState.LOADING -> stringResource(R.string.settings_models_loading)
+        ModelCatalogState.IDLE -> stringResource(R.string.settings_models_idle_badge)
+    }
+    val helperText = when (state) {
+        ModelCatalogState.IDLE -> stringResource(R.string.settings_models_idle)
+        ModelCatalogState.LOADING -> stringResource(R.string.settings_models_loading_hint)
+        ModelCatalogState.READY -> {
+            if (availableModelsCount > 0) {
+                stringResource(R.string.settings_models_loaded_count, availableModelsCount)
+            } else {
+                stringResource(R.string.settings_models_empty)
+            }
+        }
+        ModelCatalogState.ERROR -> stringResource(R.string.settings_models_error_hint)
+    }
+
+    HeadacheInsightStatusBadge(
+        label = badgeLabel,
+        color = badgeColor,
+    )
+    Text(
+        text = helperText,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = preferredTextAlign(),
+    )
+    if (state == ModelCatalogState.ERROR && !errorMessage.isNullOrBlank()) {
+        Text(
+            text = stringResource(R.string.settings_models_error_message, errorMessage),
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.error,
+            textAlign = preferredTextAlign(),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelDropdownField(
+    label: String,
+    selectedModel: String,
+    availableModels: List<String>,
+    onModelSelected: (String) -> Unit,
+) {
+    var expanded by remember(selectedModel, availableModels) { mutableStateOf(false) }
+    val options = remember(selectedModel, availableModels) {
+        buildModelOptions(
+            currentModel = selectedModel,
+            availableModels = availableModels,
+        )
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = {
+            if (options.isNotEmpty()) {
+                expanded = !expanded
+            }
+        },
+    ) {
+        OutlinedTextField(
+            value = selectedModel,
+            onValueChange = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = preferredTextAlign()),
+            label = { Text(label) },
+            placeholder = { Text(stringResource(R.string.settings_models_placeholder)) },
+            readOnly = true,
+            singleLine = true,
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { model ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = model,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = preferredTextAlign(),
+                        )
+                    },
+                    onClick = {
+                        onModelSelected(model)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun buildModelOptions(
+    currentModel: String,
+    availableModels: List<String>,
+): List<String> = buildList {
+    currentModel.trim().takeIf(String::isNotBlank)?.let(::add)
+    addAll(availableModels)
+}.map(String::trim)
+    .filter(String::isNotBlank)
+    .distinct()
 
 @Composable
 private fun ConnectionStatusBlock(

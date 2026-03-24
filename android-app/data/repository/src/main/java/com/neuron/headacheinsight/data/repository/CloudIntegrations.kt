@@ -37,6 +37,7 @@ import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.EpisodeRepository
 import com.neuron.headacheinsight.domain.LocalSpeechRecognizerEngine
+import com.neuron.headacheinsight.domain.OpenAiModelRepository
 import com.neuron.headacheinsight.domain.QuestionRepository
 import com.neuron.headacheinsight.domain.VoiceIntakeRepository
 import dagger.Binds
@@ -213,6 +214,22 @@ class DefaultBackendStatusRepository @Inject constructor(
             questionModel = credentials.questionModel,
             transcribeModel = credentials.transcribeModel,
         )
+    }
+}
+
+@Singleton
+class DefaultOpenAiModelRepository @Inject constructor(
+    private val backendApi: BackendApi,
+) : OpenAiModelRepository {
+    override suspend fun listModels(apiKey: String): Result<List<String>> = runCatching {
+        val normalizedApiKey = apiKey.trim()
+        require(normalizedApiKey.isNotBlank()) { "OpenAI API key is empty" }
+        backendApi.listModels(authorization = normalizedApiKey.toBearerHeader())
+            .data
+            .map { it.id.trim() }
+            .filter(String::isNotBlank)
+            .distinct()
+            .sortedBy { it.lowercase(Locale.ROOT) }
     }
 }
 
@@ -830,6 +847,9 @@ private fun String?.toAnswerType(): AnswerType = when (this?.uppercase(Locale.RO
     else -> AnswerType.FREE_TEXT
 }
 
+private fun String.toBearerHeader(): String =
+    if (startsWith("Bearer ", ignoreCase = true)) this else "Bearer $this"
+
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class CloudBindingsModule {
@@ -838,6 +858,9 @@ abstract class CloudBindingsModule {
 
     @Binds
     abstract fun bindBackendStatusRepository(impl: DefaultBackendStatusRepository): BackendStatusRepository
+
+    @Binds
+    abstract fun bindOpenAiModelRepository(impl: DefaultOpenAiModelRepository): OpenAiModelRepository
 
     @Binds
     abstract fun bindVoiceIntakeRepository(impl: DefaultVoiceIntakeRepository): VoiceIntakeRepository
