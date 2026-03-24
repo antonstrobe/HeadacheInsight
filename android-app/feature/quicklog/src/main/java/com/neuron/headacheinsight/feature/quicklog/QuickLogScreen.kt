@@ -1,6 +1,7 @@
 package com.neuron.headacheinsight.feature.quicklog
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,6 +11,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -27,10 +29,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -40,6 +45,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +77,7 @@ import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SelectableChipGroup
 import com.neuron.headacheinsight.core.ui.SeveritySlider
 import com.neuron.headacheinsight.core.ui.ToggleSectionCard
+import com.neuron.headacheinsight.domain.AnalysisRepository
 import com.neuron.headacheinsight.domain.AudioRecorder
 import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.CreateEpisodeUseCase
@@ -82,6 +90,8 @@ import com.neuron.headacheinsight.domain.VoiceIntakeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -126,6 +136,9 @@ data class QuickLogUiState(
     val transcriptHistory: List<String> = emptyList(),
     val liveTranscriptPreview: String = "",
     val isVoiceProcessing: Boolean = false,
+    val isPreparingFollowUp: Boolean = false,
+    val preparedQuestionCount: Int? = null,
+    val followUpErrorMessage: String? = null,
     val voiceDraft: VoiceIntakeDraft? = null,
 )
 
@@ -142,6 +155,7 @@ class QuickLogViewModel @Inject constructor(
     private val syncScheduler: SyncScheduler,
     private val timeProvider: TimeProvider,
     private val voiceIntakeRepository: VoiceIntakeRepository,
+    private val analysisRepository: AnalysisRepository,
 ) : androidx.lifecycle.ViewModel() {
     private val draft = MutableStateFlow(QuickLogUiState())
     private val transcriptForStructuring = MutableStateFlow("")
@@ -181,6 +195,20 @@ class QuickLogViewModel @Inject constructor(
                     )
                 }
         }
+
+        viewModelScope.launch {
+            draft
+                .map { it.liveTranscriptPreview.trim() }
+                .debounce(2_000)
+                .distinctUntilChanged()
+                .filter { it.isNotBlank() }
+                .collect { preview ->
+                    val episode = state.value.episode ?: return@collect
+                    if (preview == state.value.liveTranscriptPreview.trim()) {
+                        commitVoiceTranscriptSegmentInternal(episode, preview)
+                    }
+                }
+        }
     }
 
     fun setSeverity(value: Int) = draft.tryEmit(state.value.copy(severity = value))
@@ -199,10 +227,15 @@ class QuickLogViewModel @Inject constructor(
     fun setNotesText(value: String) = draft.tryEmit(state.value.copy(notesText = value))
     fun setVoiceError(value: String?) = draft.tryEmit(state.value.copy(voiceErrorMessage = value))
 
-    fun toggleRecording() {
+    fun toggleRecording(pendingPreview: String? = null) {
         val episode = state.value.episode ?: return
         viewModelScope.launch {
             if (state.value.isRecording) {
+                val previewToCommit = pendingPreview?.trim().orEmpty()
+                    .ifBlank { state.value.liveTranscriptPreview.trim() }
+                if (previewToCommit.isNotBlank()) {
+                    commitVoiceTranscriptSegmentInternal(episode, previewToCommit)
+                }
                 val currentState = state.value
                 val result = audioRecorder.stop()
                 val path = result.getOrNull()
@@ -222,7 +255,9 @@ class QuickLogViewModel @Inject constructor(
                     ),
                 )
                 if (path != null && shouldTranscribeInline && result.isSuccess) {
-                    transcribeRecordedAudio(audioPath = path, episode = episode)
+                    transcribeRecordedAudio(audioPath = path, episode = episode, prepareFollowUp = true)
+                } else if (state.value.transcriptHistory.isNotEmpty()) {
+                    prepareFollowUpQuestions(episode.id)
                 }
             } else {
                 val result = audioRecorder.start(episode.id)
@@ -231,6 +266,9 @@ class QuickLogViewModel @Inject constructor(
                         isRecording = result.isSuccess,
                         lastAudioPath = result.getOrNull(),
                         isVoiceProcessing = false,
+                        isPreparingFollowUp = false,
+                        preparedQuestionCount = null,
+                        followUpErrorMessage = null,
                         voiceErrorMessage = result.exceptionOrNull()?.message,
                     ),
                 )
@@ -250,39 +288,7 @@ class QuickLogViewModel @Inject constructor(
         val normalized = transcriptText.trim()
         if (normalized.isBlank()) return
         viewModelScope.launch {
-            val history = (state.value.transcriptHistory + normalized).distinct().takeLast(6)
-            val mergedTranscript = mergeTranscript(history, "")
-            val now = timeProvider.now()
-            episodeRepository.updateEpisode(
-                episode.copy(
-                    summaryText = mergedTranscript,
-                    transcriptStatus = TranscriptStatus.LOCAL_READY,
-                    updatedAt = now,
-                ),
-            )
-            saveTranscriptUseCase(
-                EpisodeTranscript(
-                    id = UUID.randomUUID().toString(),
-                    episodeId = episode.id,
-                    rawAudioPath = null,
-                    transcriptText = normalized,
-                    language = episode.locale,
-                    engineType = "android-live-dictation",
-                    variant = TranscriptVariant.LOCAL,
-                    confidence = null,
-                    createdAt = now,
-                ),
-                shouldCloudRetry = false,
-            )
-            draft.emit(
-                state.value.copy(
-                    transcriptHistory = history,
-                    liveTranscriptPreview = "",
-                    lastTranscriptText = normalized,
-                    voiceErrorMessage = null,
-                ),
-            )
-            transcriptForStructuring.emit(mergedTranscript)
+            commitVoiceTranscriptSegmentInternal(episode, normalized)
         }
     }
 
@@ -331,24 +337,104 @@ class QuickLogViewModel @Inject constructor(
         }
     }
 
-    private suspend fun applyVoiceDraft(voiceDraft: VoiceIntakeDraft) {
+    private suspend fun commitVoiceTranscriptSegmentInternal(
+        episode: Episode,
+        transcriptText: String,
+    ) {
+        val normalized = transcriptText.trim()
+        if (normalized.isBlank()) return
         val current = state.value
+        val history = mergeTranscriptHistory(current.transcriptHistory, normalized)
+        val finalSegment = history.lastOrNull().orEmpty()
+        if (finalSegment.isBlank()) {
+            draft.emit(current.copy(liveTranscriptPreview = ""))
+            return
+        }
+        val mergedTranscript = mergeTranscript(history, "")
+        val now = timeProvider.now()
+        episodeRepository.updateEpisode(
+            episode.copy(
+                summaryText = mergedTranscript,
+                transcriptStatus = TranscriptStatus.LOCAL_READY,
+                updatedAt = now,
+            ),
+        )
+        if (!isSameSegment(current.lastTranscriptText, finalSegment)) {
+            saveTranscriptUseCase(
+                EpisodeTranscript(
+                    id = UUID.randomUUID().toString(),
+                    episodeId = episode.id,
+                    rawAudioPath = null,
+                    transcriptText = finalSegment,
+                    language = episode.locale,
+                    engineType = "android-live-dictation",
+                    variant = TranscriptVariant.LOCAL,
+                    confidence = null,
+                    createdAt = now,
+                ),
+                shouldCloudRetry = false,
+            )
+        }
         draft.emit(
-            current.copy(
-                severity = voiceDraft.severity ?: current.severity,
-                selectedSymptoms = current.selectedSymptoms + voiceDraft.symptoms,
-                detectedSymptoms = voiceDraft.symptoms.toSet(),
-                suddenWorstPain = current.suddenWorstPain || voiceDraft.redFlags.contains("suddenWorstPain"),
-                confusion = current.confusion || voiceDraft.redFlags.contains("confusion"),
-                speechDifficulty = current.speechDifficulty || voiceDraft.redFlags.contains("speechDifficulty"),
-                oneSidedWeakness = current.oneSidedWeakness || voiceDraft.redFlags.contains("oneSidedWeakness"),
-                medicineNotes = mergeTextBlocks(current.medicineNotes, voiceDraft.medications.joinToString("\n")),
-                notesText = mergeTextBlocks(current.notesText, voiceDraft.summaryText),
-                voiceDraft = voiceDraft,
-                isVoiceProcessing = false,
+            state.value.copy(
+                transcriptHistory = history,
+                liveTranscriptPreview = "",
+                lastTranscriptText = finalSegment,
                 voiceErrorMessage = null,
             ),
         )
+        transcriptForStructuring.emit(mergedTranscript)
+    }
+
+    private suspend fun applyVoiceDraft(voiceDraft: VoiceIntakeDraft) {
+        val current = state.value
+        val updated = current.copy(
+            severity = voiceDraft.severity ?: current.severity,
+            selectedSymptoms = current.selectedSymptoms + voiceDraft.symptoms,
+            detectedSymptoms = current.detectedSymptoms + voiceDraft.symptoms,
+            suddenWorstPain = current.suddenWorstPain || voiceDraft.redFlags.contains("suddenWorstPain"),
+            confusion = current.confusion || voiceDraft.redFlags.contains("confusion"),
+            speechDifficulty = current.speechDifficulty || voiceDraft.redFlags.contains("speechDifficulty"),
+            oneSidedWeakness = current.oneSidedWeakness || voiceDraft.redFlags.contains("oneSidedWeakness"),
+            medicineNotes = mergeTextBlocks(current.medicineNotes, voiceDraft.medications.joinToString("\n")),
+            notesText = mergeTextBlocks(current.notesText, voiceDraft.summaryText),
+            voiceDraft = voiceDraft,
+            isVoiceProcessing = false,
+            voiceErrorMessage = null,
+        )
+        draft.emit(updated)
+        current.episode?.let { persistAutoFilledFields(it, updated) }
+    }
+
+    private suspend fun persistAutoFilledFields(
+        episode: Episode,
+        uiState: QuickLogUiState,
+    ) {
+        val now = timeProvider.now()
+        val summaryText = uiState.notesText
+            .ifBlank { uiState.voiceDraft?.summaryText.orEmpty() }
+            .ifBlank { mergeTranscript(uiState.transcriptHistory, uiState.liveTranscriptPreview) }
+            .takeIf { it.isNotBlank() }
+        episodeRepository.updateEpisode(
+            episode.copy(
+                currentSeverity = uiState.severity,
+                peakSeverity = maxOf(uiState.severity, episode.peakSeverity ?: uiState.severity),
+                summaryText = summaryText ?: episode.summaryText,
+                updatedAt = now,
+            ),
+        )
+        episodeRepository.replaceSymptoms(
+            episode.id,
+            uiState.selectedSymptoms.map { symptom ->
+                EpisodeSymptom(
+                    episodeId = episode.id,
+                    symptomCode = symptom,
+                    intensity = uiState.severity,
+                    present = true,
+                )
+            },
+        )
+        persistMedicationNotes(episode.id, uiState.medicineNotes)
     }
 
     private suspend fun persistMedicationNotes(episodeId: String, rawNotes: String) {
@@ -370,10 +456,64 @@ class QuickLogViewModel @Inject constructor(
             }
     }
 
+    private suspend fun prepareFollowUpQuestions(episodeId: String) {
+        draft.emit(
+            state.value.copy(
+                isPreparingFollowUp = true,
+                followUpErrorMessage = null,
+            ),
+        )
+        analysisRepository.generateFollowUpQuestions(episodeId).fold(
+            onSuccess = { questions ->
+                draft.emit(
+                    state.value.copy(
+                        isPreparingFollowUp = false,
+                        preparedQuestionCount = questions.size.takeIf { it > 0 },
+                        followUpErrorMessage = null,
+                    ),
+                )
+            },
+            onFailure = { error ->
+                draft.emit(
+                    state.value.copy(
+                        isPreparingFollowUp = false,
+                        followUpErrorMessage = error.message,
+                    ),
+                )
+            },
+        )
+    }
+
     private fun mergeTranscript(history: List<String>, preview: String): String =
         (history + preview.takeIf { it.isNotBlank() })
             .joinToString("\n")
             .trim()
+
+    private fun mergeTranscriptHistory(history: List<String>, incoming: String): List<String> {
+        val normalized = incoming.trim()
+        if (normalized.isBlank()) return history
+        val items = history.toMutableList()
+        val lastIndex = items.indexOfLast { isSameSegment(it, normalized) }
+        if (lastIndex >= 0) {
+            items[lastIndex] = pickMoreComplete(items[lastIndex], normalized)
+        } else {
+            items += normalized
+        }
+        return items
+            .map(String::trim)
+            .filter { it.isNotBlank() }
+            .takeLast(6)
+    }
+
+    private fun isSameSegment(existing: String?, incoming: String): Boolean {
+        val left = existing?.trim()?.lowercase().orEmpty()
+        val right = incoming.trim().lowercase()
+        if (left.isBlank() || right.isBlank()) return false
+        return left == right || left.contains(right) || right.contains(left)
+    }
+
+    private fun pickMoreComplete(existing: String, incoming: String): String =
+        if (incoming.trim().length >= existing.trim().length) incoming.trim() else existing.trim()
 
     private fun mergeTextBlocks(existing: String, incoming: String): String =
         (existing.lines() + incoming.lines())
@@ -382,7 +522,11 @@ class QuickLogViewModel @Inject constructor(
             .distinct()
             .joinToString("\n")
 
-    private suspend fun transcribeRecordedAudio(audioPath: String, episode: Episode) {
+    private suspend fun transcribeRecordedAudio(
+        audioPath: String,
+        episode: Episode,
+        prepareFollowUp: Boolean,
+    ) {
         draft.emit(state.value.copy(isVoiceProcessing = true, voiceErrorMessage = null))
         cloudSpeechRecognizerEngine.transcribeAudio(audioPath, episode.locale).fold(
             onSuccess = { transcript ->
@@ -391,11 +535,11 @@ class QuickLogViewModel @Inject constructor(
                     draft.emit(
                         state.value.copy(
                             isVoiceProcessing = false,
-                            voiceErrorMessage = if (episode.locale.startsWith("ru", ignoreCase = true)) {
-                                "OpenAI вернул пустую расшифровку."
-                            } else {
-                                "OpenAI returned an empty transcript."
-                            },
+                            voiceErrorMessage = localizedMessage(
+                                locale = episode.locale,
+                                ru = "OpenAI вернул пустую расшифровку.",
+                                en = "OpenAI returned an empty transcript.",
+                            ),
                         ),
                     )
                     syncScheduler.enqueueTranscription(audioPath, episode.id)
@@ -420,7 +564,7 @@ class QuickLogViewModel @Inject constructor(
                 )
                 draft.emit(
                     state.value.copy(
-                        transcriptHistory = listOf(normalized),
+                        transcriptHistory = mergeTranscriptHistory(state.value.transcriptHistory, normalized),
                         liveTranscriptPreview = "",
                         lastTranscriptText = normalized,
                         lastAudioPath = audioPath,
@@ -428,7 +572,10 @@ class QuickLogViewModel @Inject constructor(
                         voiceErrorMessage = null,
                     ),
                 )
-                transcriptForStructuring.emit(normalized)
+                transcriptForStructuring.emit(mergeTranscript(state.value.transcriptHistory, ""))
+                if (prepareFollowUp) {
+                    prepareFollowUpQuestions(episode.id)
+                }
             },
             onFailure = { error ->
                 draft.emit(
@@ -441,6 +588,12 @@ class QuickLogViewModel @Inject constructor(
             },
         )
     }
+
+    private fun localizedMessage(
+        locale: String,
+        ru: String,
+        en: String,
+    ): String = if (locale.startsWith("ru", ignoreCase = true)) ru else en
 }
 
 @Composable
@@ -486,123 +639,76 @@ fun QuickLogScreen(
     onVoicePreviewChanged: (String) -> Unit,
     onVoiceSegmentCommitted: (String) -> Unit,
     onClearVoicePreview: () -> Unit,
-    onToggleVoiceRecording: () -> Unit,
+    onToggleVoiceRecording: (String?) -> Unit,
     onVoiceError: (String?) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
     val context = LocalContext.current
+    val currentState by rememberUpdatedState(state)
     val localeTag = context.resources.configuration.locales[0]?.toLanguageTag() ?: "ru-RU"
+    val coroutineScope = rememberCoroutineScope()
     var permissionDenied by remember { mutableStateOf(false) }
     var isVoiceSessionActive by remember { mutableStateOf(false) }
     var pendingMicrophoneAction by remember { mutableStateOf<PendingMicrophoneAction?>(null) }
     var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+    var restartJob by remember { mutableStateOf<Job?>(null) }
+    var voiceLevel by remember { mutableStateOf(0f) }
 
     fun disposeSpeechRecognizer() {
+        restartJob?.cancel()
+        restartJob = null
+        speechRecognizer?.cancel()
         speechRecognizer?.destroy()
         speechRecognizer = null
+        voiceLevel = 0f
     }
 
-    fun stopVoiceSession(stopAudioRecording: Boolean) {
-        isVoiceSessionActive = false
-        speechRecognizer?.stopListening()
-        disposeSpeechRecognizer()
-        onClearVoicePreview()
-        if (stopAudioRecording && state.isRecording) {
-            onToggleVoiceRecording()
-        }
-    }
-
-    fun startLiveRecognizer(): Boolean {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            return false
-        }
-        disposeSpeechRecognizer()
-        val recognizer = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context)
+    fun scheduleRecognizerRestart(delayMillis: Long = 240L) {
+        restartJob?.cancel()
+        restartJob = coroutineScope.launch {
+            delay(delayMillis)
+            if (isVoiceSessionActive) {
+                startLiveRecognizer(
+                    context = context,
+                    localeTag = localeTag,
+                    onPreviewChanged = onVoicePreviewChanged,
+                    onSegmentCommitted = onVoiceSegmentCommitted,
+                    onVoiceError = onVoiceError,
+                    onPermissionDenied = {
+                        permissionDenied = true
+                        stopVoiceSession(
+                            state = currentState,
+                            stopAudioRecording = true,
+                            disposeSpeechRecognizer = ::disposeSpeechRecognizer,
+                            onToggleVoiceRecording = onToggleVoiceRecording,
+                            onVoiceSegmentCommitted = onVoiceSegmentCommitted,
+                            onClearVoicePreview = onClearVoicePreview,
+                            onSessionStopped = { isVoiceSessionActive = false },
+                        )
+                    },
+                    onNeedRestart = { scheduleRecognizerRestart() },
+                    onLevelChanged = { voiceLevel = it },
+                    isVoiceSessionActive = { isVoiceSessionActive },
+                    setRecognizer = { speechRecognizer = it },
+                    clearRecognizer = ::disposeSpeechRecognizer,
+                )
             }
-        }.getOrElse {
-            return false
         }
-        speechRecognizer = recognizer
-        recognizer.setRecognitionListener(
-            object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) = Unit
-
-                override fun onBeginningOfSpeech() = Unit
-
-                override fun onRmsChanged(rmsdB: Float) = Unit
-
-                override fun onBufferReceived(buffer: ByteArray?) = Unit
-
-                override fun onEndOfSpeech() = Unit
-
-                override fun onError(error: Int) {
-                    if (!isVoiceSessionActive) {
-                        disposeSpeechRecognizer()
-                        return
-                    }
-                    when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH,
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-                        SpeechRecognizer.ERROR_CLIENT
-                        -> {
-                            startLiveRecognizer()
-                        }
-
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
-                            permissionDenied = true
-                            stopVoiceSession(stopAudioRecording = true)
-                            onVoiceError(context.getString(R.string.quicklog_audio_permission_required))
-                        }
-
-                        else -> {
-                            stopVoiceSession(stopAudioRecording = true)
-                            onVoiceError(context.getString(R.string.quicklog_voice_error_code, error))
-                        }
-                    }
-                }
-
-                override fun onResults(results: Bundle?) {
-                    val transcript = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                        ?.trim()
-                        .orEmpty()
-                    if (transcript.isNotBlank()) {
-                        onVoiceSegmentCommitted(transcript)
-                    }
-                    if (isVoiceSessionActive) {
-                        startLiveRecognizer()
-                    } else {
-                        disposeSpeechRecognizer()
-                    }
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val transcript = partialResults
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                        ?.trim()
-                        .orEmpty()
-                    onVoicePreviewChanged(transcript)
-                }
-
-                override fun onEvent(eventType: Int, params: Bundle?) = Unit
-            },
-        )
-        onVoiceError(null)
-        recognizer.startListening(buildLiveDictationIntent(context, localeTag))
-        return true
     }
 
     DisposableEffect(context) {
         onDispose {
-            stopVoiceSession(stopAudioRecording = true)
+            stopVoiceSession(
+                state = currentState,
+                stopAudioRecording = true,
+                disposeSpeechRecognizer = ::disposeSpeechRecognizer,
+                onToggleVoiceRecording = onToggleVoiceRecording,
+                onVoiceSegmentCommitted = onVoiceSegmentCommitted,
+                onClearVoicePreview = onClearVoicePreview,
+                onSessionStopped = { isVoiceSessionActive = false },
+            )
         }
     }
 
@@ -613,11 +719,28 @@ fun QuickLogScreen(
         val pendingAction = pendingMicrophoneAction
         pendingMicrophoneAction = null
         if (granted && pendingAction == PendingMicrophoneAction.VOICE_FILL) {
-            if (!state.isRecording) {
-                onToggleVoiceRecording()
+            if (!currentState.isRecording) {
+                onToggleVoiceRecording(null)
             }
             isVoiceSessionActive = true
-            startLiveRecognizer()
+            val started = startLiveRecognizer(
+                context = context,
+                localeTag = localeTag,
+                onPreviewChanged = onVoicePreviewChanged,
+                onSegmentCommitted = onVoiceSegmentCommitted,
+                onVoiceError = onVoiceError,
+                onPermissionDenied = {
+                    permissionDenied = true
+                },
+                onNeedRestart = { scheduleRecognizerRestart() },
+                onLevelChanged = { voiceLevel = it },
+                isVoiceSessionActive = { isVoiceSessionActive },
+                setRecognizer = { speechRecognizer = it },
+                clearRecognizer = ::disposeSpeechRecognizer,
+            )
+            if (!started) {
+                onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+            }
         }
     }
 
@@ -636,22 +759,51 @@ fun QuickLogScreen(
 
     fun handleVoiceSessionButton() {
         if (isVoiceSessionActive) {
-            stopVoiceSession(stopAudioRecording = true)
+            stopVoiceSession(
+                state = currentState,
+                stopAudioRecording = true,
+                disposeSpeechRecognizer = ::disposeSpeechRecognizer,
+                onToggleVoiceRecording = onToggleVoiceRecording,
+                onVoiceSegmentCommitted = onVoiceSegmentCommitted,
+                onClearVoicePreview = onClearVoicePreview,
+                onSessionStopped = { isVoiceSessionActive = false },
+            )
         } else {
             ensureMicrophonePermission {
                 onVoiceError(null)
-                if (!state.isRecording) {
-                    onToggleVoiceRecording()
+                if (!currentState.isRecording) {
+                    onToggleVoiceRecording(null)
                 }
                 isVoiceSessionActive = true
-                startLiveRecognizer()
+                val started = startLiveRecognizer(
+                    context = context,
+                    localeTag = localeTag,
+                    onPreviewChanged = onVoicePreviewChanged,
+                    onSegmentCommitted = onVoiceSegmentCommitted,
+                    onVoiceError = onVoiceError,
+                    onPermissionDenied = {
+                        permissionDenied = true
+                    },
+                    onNeedRestart = { scheduleRecognizerRestart() },
+                    onLevelChanged = { voiceLevel = it },
+                    isVoiceSessionActive = { isVoiceSessionActive },
+                    setRecognizer = { speechRecognizer = it },
+                    clearRecognizer = ::disposeSpeechRecognizer,
+                )
+                if (!started) {
+                    onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+                }
             }
         }
     }
 
     val transcriptFeed = (state.transcriptHistory + state.liveTranscriptPreview.takeIf { it.isNotBlank() })
         .filterNotNull()
-        .takeLast(5)
+        .distinct()
+        .takeLast(6)
+    val currentLiveText = state.liveTranscriptPreview.ifBlank {
+        transcriptFeed.lastOrNull().orEmpty()
+    }
     val symptomOptions = (DefaultSymptoms + state.detectedSymptoms).distinct()
 
     Scaffold(
@@ -714,8 +866,40 @@ fun QuickLogScreen(
                 )
                 VoiceSessionStatus(
                     isListening = isVoiceSessionActive,
-                    isProcessing = state.isVoiceProcessing,
+                    isProcessing = state.isVoiceProcessing || state.isPreparingFollowUp,
                 )
+                VoiceActivityVisualizer(
+                    isListening = isVoiceSessionActive,
+                    isProcessing = state.isVoiceProcessing || state.isPreparingFollowUp,
+                    level = voiceLevel,
+                )
+                LiveTranscriptHero(
+                    transcript = currentLiveText,
+                    isListening = isVoiceSessionActive,
+                )
+                if (state.isPreparingFollowUp) {
+                    HeadacheInsightStatusBadge(
+                        label = stringResource(R.string.quicklog_follow_up_preparing),
+                        color = HeadacheInsightStatusColors.CloudAnalyzed,
+                    )
+                }
+                state.preparedQuestionCount?.let {
+                    HeadacheInsightStatusBadge(
+                        label = stringResource(R.string.quicklog_follow_up_ready, it),
+                        color = HeadacheInsightStatusColors.CloudAnalyzed,
+                    )
+                    Text(
+                        text = stringResource(R.string.quicklog_follow_up_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+                state.followUpErrorMessage?.let {
+                    Text(
+                        text = stringResource(R.string.quicklog_follow_up_error, it),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 SeveritySlider(severity = state.severity, onSeverityChanged = onSeverityChanged)
             }
 
@@ -729,6 +913,11 @@ fun QuickLogScreen(
                     transcriptFeed.forEachIndexed { index, item ->
                         Text(
                             text = item,
+                            style = if (index == transcriptFeed.lastIndex) {
+                                MaterialTheme.typography.bodyLarge
+                            } else {
+                                MaterialTheme.typography.bodyMedium
+                            },
                             modifier = Modifier.alpha(
                                 if (index == transcriptFeed.lastIndex && state.liveTranscriptPreview.isNotBlank()) 0.86f else 1f,
                             ),
@@ -810,7 +999,10 @@ fun QuickLogScreen(
                 Text(stringResource(R.string.quicklog_dictation_saved, it))
             }
             state.voiceErrorMessage?.let {
-                Text(stringResource(R.string.quicklog_voice_error, it))
+                Text(
+                    text = stringResource(R.string.quicklog_voice_error, it),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
             if (state.urgentMessage.isNotBlank()) {
                 Text(state.urgentMessage)
@@ -842,6 +1034,76 @@ private fun VoiceSessionStatus(
     ) {
         PulsingDot(active = isListening, color = HeadacheInsightStatusColors.LocalComplete)
         HeadacheInsightStatusBadge(label = label, color = color)
+    }
+}
+
+@Composable
+private fun LiveTranscriptHero(
+    transcript: String,
+    isListening: Boolean,
+) {
+    HeadacheInsightSectionCard(
+        title = stringResource(R.string.quicklog_live_now_title),
+        supportingText = stringResource(R.string.quicklog_live_now_subtitle),
+    ) {
+        Text(
+            text = transcript.ifBlank { stringResource(R.string.quicklog_live_empty) },
+            style = MaterialTheme.typography.headlineSmall,
+            color = if (transcript.isBlank()) {
+                MaterialTheme.colorScheme.outline
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.alpha(if (isListening && transcript.isNotBlank()) 0.96f else 1f),
+        )
+    }
+}
+
+@Composable
+private fun VoiceActivityVisualizer(
+    isListening: Boolean,
+    isProcessing: Boolean,
+    level: Float,
+) {
+    val transition = rememberInfiniteTransition(label = "voice-bars")
+    val pulse by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "voice-bars-pulse",
+    )
+    val color by animateColorAsState(
+        targetValue = when {
+            isListening -> HeadacheInsightStatusColors.LocalComplete
+            isProcessing -> HeadacheInsightStatusColors.CloudAnalyzed
+            else -> HeadacheInsightStatusColors.Queued
+        },
+        label = "voice-bars-color",
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        repeat(5) { index ->
+            val activity = when {
+                isListening -> ((level * 0.72f) + (pulse * (0.28f + index * 0.03f))).coerceIn(0.18f, 1f)
+                isProcessing -> (0.26f + pulse * 0.25f).coerceIn(0.2f, 0.7f)
+                else -> 0.16f
+            }
+            Box(
+                modifier = Modifier
+                    .width(10.dp)
+                    .height((18 + activity * 28).dp)
+                    .background(
+                        color = color.copy(alpha = 0.26f + activity * 0.58f),
+                        shape = RoundedCornerShape(14.dp),
+                    ),
+            )
+        }
     }
 }
 
@@ -881,15 +1143,149 @@ private fun RedFlagToggle(
     )
 }
 
-private fun buildLiveDictationIntent(
-    context: android.content.Context,
+private fun stopVoiceSession(
+    state: QuickLogUiState,
+    stopAudioRecording: Boolean,
+    disposeSpeechRecognizer: () -> Unit,
+    onToggleVoiceRecording: (String?) -> Unit,
+    onVoiceSegmentCommitted: (String) -> Unit,
+    onClearVoicePreview: () -> Unit,
+    onSessionStopped: () -> Unit,
+) {
+    onSessionStopped()
+    val preview = state.liveTranscriptPreview.trim().takeIf { it.isNotBlank() }
+    disposeSpeechRecognizer()
+    when {
+        stopAudioRecording && state.isRecording -> onToggleVoiceRecording(preview)
+        preview != null -> onVoiceSegmentCommitted(preview)
+        else -> onClearVoicePreview()
+    }
+}
+
+private fun startLiveRecognizer(
+    context: Context,
     localeTag: String,
+    onPreviewChanged: (String) -> Unit,
+    onSegmentCommitted: (String) -> Unit,
+    onVoiceError: (String?) -> Unit,
+    onPermissionDenied: () -> Unit,
+    onNeedRestart: () -> Unit,
+    onLevelChanged: (Float) -> Unit,
+    isVoiceSessionActive: () -> Boolean,
+    setRecognizer: (SpeechRecognizer) -> Unit,
+    clearRecognizer: () -> Unit,
+): Boolean {
+    if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        return false
+    }
+    clearRecognizer()
+    val preferOffline = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+    val recognizer = runCatching {
+        if (preferOffline) {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        }
+    }.getOrElse {
+        return false
+    }
+    setRecognizer(recognizer)
+    recognizer.setRecognitionListener(
+        object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) = Unit
+
+            override fun onBeginningOfSpeech() = Unit
+
+            override fun onRmsChanged(rmsdB: Float) {
+                onLevelChanged(((rmsdB + 2f) / 12f).coerceIn(0.06f, 1f))
+            }
+
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+            override fun onEndOfSpeech() = Unit
+
+            override fun onError(error: Int) {
+                onLevelChanged(0f)
+                if (!isVoiceSessionActive()) {
+                    clearRecognizer()
+                    return
+                }
+                when (error) {
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                        onPermissionDenied()
+                    }
+
+                    SpeechRecognizer.ERROR_NO_MATCH,
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+                    SpeechRecognizer.ERROR_CLIENT,
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                    SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+                    SpeechRecognizer.ERROR_SERVER,
+                    SpeechRecognizer.ERROR_AUDIO,
+                    -> onNeedRestart()
+
+                    else -> {
+                        onVoiceError(context.getString(R.string.quicklog_voice_error_code, error))
+                        onNeedRestart()
+                    }
+                }
+            }
+
+            override fun onResults(results: Bundle?) {
+                val transcript = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+                onLevelChanged(0f)
+                if (transcript.isNotBlank()) {
+                    onSegmentCommitted(transcript)
+                }
+                if (isVoiceSessionActive()) {
+                    onNeedRestart()
+                } else {
+                    clearRecognizer()
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val transcript = partialResults
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+                onPreviewChanged(transcript)
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        },
+    )
+    onVoiceError(null)
+    recognizer.startListening(
+        buildLiveDictationIntent(
+            context = context,
+            localeTag = localeTag,
+            preferOffline = preferOffline,
+        ),
+    )
+    return true
+}
+
+private fun buildLiveDictationIntent(
+    context: Context,
+    localeTag: String,
+    preferOffline: Boolean,
 ): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
     putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, localeTag)
-    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, preferOffline)
     putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.quicklog_dictation_prompt))
     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1300L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1200L)
 }

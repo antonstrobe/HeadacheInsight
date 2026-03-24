@@ -6,4 +6,21 @@
     <string name="questionnaire_save">Сохранить</string>
     <string name="questionnaire_empty_title">Вопросов пока нет</string>
     <string name="questionnaire_empty_subtitle">Сгенерируйте уточняющие вопросы после того, как у активного эпизода появятся данные.</string>
+    <string name="questionnaire_analyze">Проанализировать и обновить вопросы</string>
+    <string name="questionnaire_analyzing">Идёт анализ...</string>
+    <string name="questionnaire_generated_count">Готово новых уточняющих вопросов: %1$d</string>
+    <string name="questionnaire_analysis_error">Ошибка анализа: %1$s</string>
+    <string name="questionnaire_episode_title">Открытый эпизод</string>
+    <string name="questionnaire_episode_subtitle">Сверху краткое состояние, ниже появляются новые кнопки и поля по итогам анализа.</string>
+    <string name="questionnaire_episode_status">Статус</string>
+    <string name="questionnaire_episode_severity">Сила боли</string>
+    <string name="questionnaire_analysis_title">Последний анализ</string>
+    <string name="questionnaire_analysis_subtitle">Структурированная сводка и новые уточнения для текущего эпизода.</string>
+    <string name="questionnaire_analysis_next_questions">Предложено вопросов: %1$d</string>
+    <string name="questionnaire_required">Обязательно</string>
+    <string name="questionnaire_optional">Можно пропустить</string>
+    <string name="questionnaire_yes">Да</string>
+    <string name="questionnaire_no">Нет</string>
+    <string name="questionnaire_scale_value">Значение: %1$d</string>
+    <string name="questionnaire_number_label">Число</string>
 </resources>

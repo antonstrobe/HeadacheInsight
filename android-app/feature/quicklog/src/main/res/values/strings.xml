@@ -28,8 +28,14 @@
     <string name="quicklog_live_title">Live transcript</string>
     <string name="quicklog_live_subtitle">Recent speech appears here so you can see that recognition and server updates are working.</string>
     <string name="quicklog_live_empty">Start voice fill to see live speech here.</string>
+    <string name="quicklog_live_now_title">Speaking now</string>
+    <string name="quicklog_live_now_subtitle">A short pause auto-fixes the phrase and keeps listening without manual restarts.</string>
     <string name="quicklog_detected_title">Detected from voice</string>
     <string name="quicklog_detected_subtitle">These fields are built from the structured JSON draft returned while you speak.</string>
+    <string name="quicklog_follow_up_preparing">Preparing follow-up questions</string>
+    <string name="quicklog_follow_up_ready">%1$d follow-up questions are ready</string>
+    <string name="quicklog_follow_up_hint">Open “Continue open items” to answer the new buttons, checkboxes, and fields.</string>
+    <string name="quicklog_follow_up_error">Could not prepare follow-up questions: %1$s</string>
     <string name="quicklog_voice_status_idle">Voice idle</string>
     <string name="quicklog_voice_status_listening">Listening now</string>
     <string name="quicklog_voice_status_processing">Updating draft</string>

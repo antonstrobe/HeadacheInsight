@@ -34,4 +34,10 @@
     <string name="quicklog_voice_status_listening">Слушаю</string>
     <string name="quicklog_voice_status_processing">Обновляю черновик</string>
     <string name="quicklog_voice_status_listening_processing">Слушаю и обновляю</string>
+    <string name="quicklog_live_now_title">Слышу сейчас</string>
+    <string name="quicklog_live_now_subtitle">Короткая пауза сама фиксирует фразу и запись продолжается без ручного перезапуска.</string>
+    <string name="quicklog_follow_up_preparing">Готовлю уточняющие вопросы</string>
+    <string name="quicklog_follow_up_ready">Уточняющих вопросов готово: %1$d</string>
+    <string name="quicklog_follow_up_hint">Откройте «Продолжить открытое», чтобы ответить на новые кнопки, чекбоксы и поля.</string>
+    <string name="quicklog_follow_up_error">Не удалось подготовить уточняющие вопросы: %1$s</string>
 </resources>

@@ -4,6 +4,23 @@
     <string name="questionnaire_answer_help">You can save partial answers and come back later.</string>
     <string name="questionnaire_answer_label">Answer</string>
     <string name="questionnaire_save">Save</string>
+    <string name="questionnaire_analyze">Analyze and refresh questions</string>
+    <string name="questionnaire_analyzing">Analyzing...</string>
+    <string name="questionnaire_generated_count">%1$d new follow-up questions ready</string>
+    <string name="questionnaire_analysis_error">Analysis error: %1$s</string>
+    <string name="questionnaire_episode_title">Open episode</string>
+    <string name="questionnaire_episode_subtitle">This block stays compact, while analysis builds the next controls below.</string>
+    <string name="questionnaire_episode_status">Status</string>
+    <string name="questionnaire_episode_severity">Severity</string>
+    <string name="questionnaire_analysis_title">Latest analysis</string>
+    <string name="questionnaire_analysis_subtitle">The structured summary and follow-up suggestions from the current episode.</string>
+    <string name="questionnaire_analysis_next_questions">%1$d suggested next questions</string>
+    <string name="questionnaire_required">Required</string>
+    <string name="questionnaire_optional">Optional</string>
+    <string name="questionnaire_yes">Yes</string>
+    <string name="questionnaire_no">No</string>
+    <string name="questionnaire_scale_value">Value: %1$d</string>
+    <string name="questionnaire_number_label">Number</string>
     <string name="questionnaire_empty_title">No questions yet</string>
     <string name="questionnaire_empty_subtitle">Generate follow-up questions after you have an active episode with some data.</string>
 </resources>
