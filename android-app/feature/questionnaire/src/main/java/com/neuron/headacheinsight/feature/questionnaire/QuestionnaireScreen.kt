@@ -587,12 +587,14 @@ private fun QuestionEditorCard(
         isPartial: Boolean,
     ) {
         voiceLiveSegment = ""
+        val mergedSegments = mergeVoiceSegments(voiceSegments, transcript)
         voiceSegments.clear()
-        transcript.trim().takeIf(String::isNotBlank)?.let(voiceSegments::add)
-        voiceError = if (transcript.isBlank()) {
+        voiceSegments.addAll(mergedSegments)
+        val mergedTranscript = mergeVoiceTranscript(voiceSegments, voiceLiveSegment)
+        voiceError = if (mergedTranscript.isBlank()) {
             if (isPartial) null else voiceEmptyResult
         } else {
-            applyVoiceTranscript(transcript, isPartial = isPartial)
+            applyVoiceTranscript(mergedTranscript, isPartial = isPartial)
         }
     }
 
