@@ -1,17 +1,17 @@
 <resources>
     <string name="settings_cloud_title">Облачный анализ</string>
-    <string name="settings_cloud_subtitle">Включайте удалённый анализ только тогда, когда нужны структурированные ответы от вашего сервера.</string>
+    <string name="settings_cloud_subtitle">Включайте прямой анализ через OpenAI только когда нужны живые структурированные ответы внутри приложения.</string>
     <string name="settings_backend_title">Сервер анализа</string>
     <string name="settings_backend_subtitle">Укажите адрес вашего backend или proxy.</string>
     <string name="settings_backend_label">URL сервера</string>
     <string name="settings_openai_title">OpenAI / ChatGPT API</string>
-    <string name="settings_openai_subtitle">Введите свой API-ключ прямо в приложении. Он хранится в изолированном хранилище Android и отправляется только на ваш сервер по HTTPS.</string>
+    <string name="settings_openai_subtitle">Введите свой OpenAI API-ключ. Телефон будет обращаться к OpenAI напрямую по HTTPS.</string>
     <string name="settings_openai_key_label">API-ключ</string>
-    <string name="settings_openai_storage_note">Хранится локально в защищённом хранилище Android Keystore.</string>
+    <string name="settings_openai_storage_note">Хранится локально на этом устройстве.</string>
     <string name="settings_key_show">Показать ключ</string>
     <string name="settings_key_hide">Скрыть ключ</string>
     <string name="settings_models_title">Модели</string>
-    <string name="settings_models_subtitle">Меняйте эти значения только если точно понимаете, какие OpenAI-модели должен использовать ваш сервер.</string>
+    <string name="settings_models_subtitle">Эти модели используются напрямую для анализа, уточняющих вопросов и транскрибации.</string>
     <string name="settings_analysis_model_label">Модель анализа</string>
     <string name="settings_question_model_label">Модель вопросов</string>
     <string name="settings_transcribe_model_label">Модель транскрибации</string>
@@ -34,4 +34,14 @@
     <string name="settings_language_english">Английский</string>
     <string name="settings_language_selected">Выбрано: %1$s</string>
     <string name="settings_save">Сохранить настройки</string>
+    <string name="settings_save_and_test">Сохранить и проверить связь</string>
+    <string name="settings_connection_idle">Связь ещё не проверялась</string>
+    <string name="settings_connection_testing">Проверяем связь с OpenAI...</string>
+    <string name="settings_connection_success">OpenAI ответил</string>
+    <string name="settings_connection_error">Ошибка соединения</string>
+    <string name="settings_connection_service">Сервис: %1$s</string>
+    <string name="settings_connection_models">Модели: %1$s / %2$s / %3$s</string>
+    <string name="settings_connection_key_present">OpenAI принял API-ключ.</string>
+    <string name="settings_connection_key_missing">API-ключ не передан или пустой.</string>
+    <string name="settings_connection_error_message">Последняя ошибка: %1$s</string>
 </resources>

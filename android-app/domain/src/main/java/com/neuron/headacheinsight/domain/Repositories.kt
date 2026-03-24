@@ -5,6 +5,7 @@ import com.neuron.headacheinsight.core.model.AnalysisSnapshot
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.Attachment
 import com.neuron.headacheinsight.core.model.BaselineQuestionAnswer
+import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
 import com.neuron.headacheinsight.core.model.Episode
 import com.neuron.headacheinsight.core.model.EpisodeContext
@@ -24,6 +25,7 @@ import com.neuron.headacheinsight.core.model.RedFlagEvent
 import com.neuron.headacheinsight.core.model.ReportBundle
 import com.neuron.headacheinsight.core.model.SyncQueueItem
 import com.neuron.headacheinsight.core.model.UserProfile
+import com.neuron.headacheinsight.core.model.VoiceIntakeDraft
 import kotlinx.coroutines.flow.Flow
 
 interface ProfileRepository {
@@ -78,6 +80,14 @@ interface AnalysisRepository {
     suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse>
     suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>>
     suspend fun analyzeAttachments(ownerId: String): Result<List<String>>
+}
+
+interface BackendStatusRepository {
+    suspend fun testConnection(): Result<BackendConnectionStatus>
+}
+
+interface VoiceIntakeRepository {
+    suspend fun structureVoiceIntake(ownerId: String, locale: String, transcriptText: String): Result<VoiceIntakeDraft>
 }
 
 interface SyncRepository {

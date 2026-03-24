@@ -127,7 +127,7 @@ fun HeadacheInsightNavHost(
         composable(HeadacheInsightDestination.Home.route) {
             HomeRoute(
                 onStartEpisode = { navController.navigate(HeadacheInsightDestination.QuickLog.route) },
-                onContinueEpisode = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
+                onContinueEpisode = { navController.navigate(HeadacheInsightDestination.Questionnaire.create(it)) },
                 onHistory = { navController.navigate(HeadacheInsightDestination.Insights.route) },
                 onProfile = { navController.navigate(HeadacheInsightDestination.Profile.route) },
                 onAttachments = { navController.navigate(HeadacheInsightDestination.Attachments.route) },

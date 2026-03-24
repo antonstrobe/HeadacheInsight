@@ -1,17 +1,17 @@
 <resources>
     <string name="settings_cloud_title">Cloud analysis</string>
-    <string name="settings_cloud_subtitle">Enable remote analysis only when you want structured responses from your own server.</string>
+    <string name="settings_cloud_subtitle">Enable direct OpenAI analysis only when you want live structured responses from the app.</string>
     <string name="settings_backend_title">Analysis server</string>
     <string name="settings_backend_subtitle">Point the app to your backend or proxy URL.</string>
     <string name="settings_backend_label">Server URL</string>
     <string name="settings_openai_title">OpenAI / ChatGPT API</string>
-    <string name="settings_openai_subtitle">Enter your own API key inside the app. It stays in Android isolated storage and is sent only to your server over HTTPS.</string>
+    <string name="settings_openai_subtitle">Enter your OpenAI API key here. The phone uses it directly to call OpenAI over HTTPS.</string>
     <string name="settings_openai_key_label">API key</string>
-    <string name="settings_openai_storage_note">Stored locally in Android Keystore-backed secure storage.</string>
+    <string name="settings_openai_storage_note">Stored locally on this device.</string>
     <string name="settings_key_show">Show key</string>
     <string name="settings_key_hide">Hide key</string>
     <string name="settings_models_title">Models</string>
-    <string name="settings_models_subtitle">Change these only if you know exactly which OpenAI models your backend should use.</string>
+    <string name="settings_models_subtitle">These models are used directly for analysis, follow-up questions, and transcription.</string>
     <string name="settings_analysis_model_label">Analysis model</string>
     <string name="settings_question_model_label">Question model</string>
     <string name="settings_transcribe_model_label">Transcription model</string>
@@ -34,4 +34,14 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_selected">Selected: %1$s</string>
     <string name="settings_save">Save settings</string>
+    <string name="settings_save_and_test">Save and test connection</string>
+    <string name="settings_connection_idle">Connection not checked</string>
+    <string name="settings_connection_testing">Checking OpenAI connection...</string>
+    <string name="settings_connection_success">OpenAI responded</string>
+    <string name="settings_connection_error">Connection error</string>
+    <string name="settings_connection_service">Service: %1$s</string>
+    <string name="settings_connection_models">Models: %1$s / %2$s / %3$s</string>
+    <string name="settings_connection_key_present">API key accepted by OpenAI.</string>
+    <string name="settings_connection_key_missing">API key is missing or empty.</string>
+    <string name="settings_connection_error_message">Last error: %1$s</string>
 </resources>

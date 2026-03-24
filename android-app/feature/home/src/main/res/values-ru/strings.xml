@@ -10,7 +10,7 @@
     <string name="home_local_only">Только локально</string>
     <string name="home_queue_count">Очередь %1$d</string>
     <string name="home_monthly_headache_days">Дней с головной болью за месяц: %1$d</string>
-    <string name="home_continue_episode">Продолжить незавершённую запись</string>
+    <string name="home_continue_episode">Продолжить открытое</string>
     <string name="home_history">История</string>
     <string name="home_profile">Профиль</string>
     <string name="home_attachments">Вложения / анализы</string>

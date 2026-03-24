@@ -16,11 +16,14 @@ from app.models.contracts import (
     AnalyzeEpisodeRequest,
     ClientRegisterRequest,
     ClientRegisterResponse,
+    ConnectionTestResponse,
     GenerateFollowUpQuestionsRequest,
     GenerateFollowUpQuestionsResponse,
     HealthResponse,
     TranscribeMetadata,
     TranscribeResponse,
+    VoiceIntakeDraftRequest,
+    VoiceIntakeDraftResponse,
 )
 from app.models.store import AuditLog, InstallClient
 from app.services.openai_service import OpenAIRequestOverrides, OpenAIService
@@ -59,6 +62,18 @@ async def trace_middleware(request: Request, call_next):
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse()
+
+
+@app.get("/api/connection-test", response_model=ConnectionTestResponse)
+def connection_test(request: Request) -> ConnectionTestResponse:
+    overrides = request_openai_overrides(request)
+    api_key = overrides.api_key or settings.openai_api_key
+    return ConnectionTestResponse(
+        api_key_present=bool(api_key and api_key != "sk-placeholder"),
+        analysis_model=overrides.analysis_model or settings.openai_analysis_model,
+        question_model=overrides.question_model or settings.openai_question_model,
+        transcribe_model=overrides.transcribe_model or settings.openai_transcribe_model,
+    )
 
 
 @app.post("/api/client/register", response_model=ClientRegisterResponse)
@@ -126,6 +141,16 @@ async def analyze_attachments(request: Request) -> AnalyzeAttachmentsResponse:
     response = service.analyze_attachments(payload.model_dump(), overrides=request_openai_overrides(request))
     record_audit(request.state.trace_id, request.url.path, request.method, True, "attachments-analyzed", install_id)
     return AnalyzeAttachmentsResponse.model_validate(response)
+
+
+@app.post("/api/voice-intake-draft", response_model=VoiceIntakeDraftResponse)
+async def voice_intake_draft(request: Request) -> VoiceIntakeDraftResponse:
+    body = await request.body()
+    install_id = require_signature(request, body)
+    payload = VoiceIntakeDraftRequest.model_validate_json(body)
+    response = service.voice_intake_draft(payload.model_dump(), overrides=request_openai_overrides(request))
+    record_audit(request.state.trace_id, request.url.path, request.method, True, "voice-intake-draft", install_id)
+    return VoiceIntakeDraftResponse.model_validate(response)
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)

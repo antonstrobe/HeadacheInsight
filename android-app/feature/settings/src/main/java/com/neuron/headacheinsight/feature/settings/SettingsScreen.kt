@@ -27,27 +27,48 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
+import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
+import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.model.AppSettings
+import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
 import com.neuron.headacheinsight.core.model.LocalSpeechPackState
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.core.ui.ToggleSectionCard
+import com.neuron.headacheinsight.domain.BackendStatusRepository
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import com.neuron.headacheinsight.domain.LocalSpeechPackManager
 import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class ConnectionCheckState {
+    IDLE,
+    TESTING,
+    SUCCESS,
+    ERROR,
+}
+
+private data class ConnectionUiState(
+    val state: ConnectionCheckState = ConnectionCheckState.IDLE,
+    val status: BackendConnectionStatus? = null,
+    val errorMessage: String? = null,
+)
+
 data class SettingsUiState(
     val appSettings: AppSettings = AppSettings(),
     val cloudCredentials: CloudCredentials = CloudCredentials(),
     val localSpeechPack: LocalSpeechPackState = LocalSpeechPackState(),
+    val connectionState: ConnectionCheckState = ConnectionCheckState.IDLE,
+    val connectionStatus: BackendConnectionStatus? = null,
+    val connectionErrorMessage: String? = null,
 )
 
 @HiltViewModel
@@ -55,22 +76,28 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val localSpeechPackManager: LocalSpeechPackManager,
+    private val backendStatusRepository: BackendStatusRepository,
 ) : androidx.lifecycle.ViewModel() {
+    private val connectionState = MutableStateFlow(ConnectionUiState())
+
     val state: StateFlow<SettingsUiState> = combine(
         settingsRepository.observeSettings(),
         cloudCredentialsRepository.observeCredentials(),
         localSpeechPackManager.observeState(),
-    ) { settings, cloudCredentials, localSpeechPack ->
+        connectionState,
+    ) { settings, cloudCredentials, localSpeechPack, connection ->
         SettingsUiState(
             appSettings = settings,
             cloudCredentials = cloudCredentials,
             localSpeechPack = localSpeechPack,
+            connectionState = connection.state,
+            connectionStatus = connection.status,
+            connectionErrorMessage = connection.errorMessage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun save(
         cloudEnabled: Boolean,
-        backendUrl: String,
         languageTag: String,
         apiKey: String,
         analysisModel: String,
@@ -78,24 +105,53 @@ class SettingsViewModel @Inject constructor(
         transcribeModel: String,
     ) {
         viewModelScope.launch {
-            val normalizedBackendUrl = backendUrl.trim().ifBlank { DEFAULT_BACKEND_URL }
-            cloudCredentialsRepository.saveCredentials(
-                CloudCredentials(
-                    apiKey = apiKey.trim(),
-                    analysisModel = analysisModel.trim(),
-                    questionModel = questionModel.trim(),
-                    transcribeModel = transcribeModel.trim(),
-                ),
+            persistSettings(
+                cloudEnabled = cloudEnabled,
+                languageTag = languageTag,
+                apiKey = apiKey,
+                analysisModel = analysisModel,
+                questionModel = questionModel,
+                transcribeModel = transcribeModel,
             )
-            settingsRepository.updateSettings {
-                it.copy(
-                    cloudAnalysisEnabled = cloudEnabled,
-                    backendBaseUrl = normalizedBackendUrl,
-                    languageTag = languageTag,
-                    languageSelectionCompleted = true,
-                    lastSeedVersion = if (it.languageTag == languageTag) it.lastSeedVersion else null,
-                )
-            }
+        }
+    }
+
+    fun saveAndTest(
+        cloudEnabled: Boolean,
+        languageTag: String,
+        apiKey: String,
+        analysisModel: String,
+        questionModel: String,
+        transcribeModel: String,
+    ) {
+        viewModelScope.launch {
+            persistSettings(
+                cloudEnabled = cloudEnabled,
+                languageTag = languageTag,
+                apiKey = apiKey,
+                analysisModel = analysisModel,
+                questionModel = questionModel,
+                transcribeModel = transcribeModel,
+            )
+            connectionState.emit(ConnectionUiState(state = ConnectionCheckState.TESTING))
+            backendStatusRepository.testConnection().fold(
+                onSuccess = { status ->
+                    connectionState.emit(
+                        ConnectionUiState(
+                            state = ConnectionCheckState.SUCCESS,
+                            status = status,
+                        ),
+                    )
+                },
+                onFailure = { error ->
+                    connectionState.emit(
+                        ConnectionUiState(
+                            state = ConnectionCheckState.ERROR,
+                            errorMessage = error.message,
+                        ),
+                    )
+                },
+            )
         }
     }
 
@@ -111,8 +167,31 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8000/"
+    private suspend fun persistSettings(
+        cloudEnabled: Boolean,
+        languageTag: String,
+        apiKey: String,
+        analysisModel: String,
+        questionModel: String,
+        transcribeModel: String,
+    ) {
+        val defaults = CloudCredentials()
+        cloudCredentialsRepository.saveCredentials(
+            CloudCredentials(
+                apiKey = apiKey.trim(),
+                analysisModel = analysisModel.trim().ifBlank { defaults.analysisModel },
+                questionModel = questionModel.trim().ifBlank { defaults.questionModel },
+                transcribeModel = transcribeModel.trim().ifBlank { defaults.transcribeModel },
+            ),
+        )
+        settingsRepository.updateSettings {
+            it.copy(
+                cloudAnalysisEnabled = cloudEnabled,
+                languageTag = languageTag,
+                languageSelectionCompleted = true,
+                lastSeedVersion = if (it.languageTag == languageTag) it.lastSeedVersion else null,
+            )
+        }
     }
 }
 
@@ -129,6 +208,7 @@ fun SettingsRoute(
     SettingsScreen(
         state = state,
         onSave = viewModel::save,
+        onSaveAndTest = viewModel::saveAndTest,
         onRefreshLocalSpeech = viewModel::refreshLocalSpeech,
         onInstallLocalSpeech = viewModel::installLocalSpeech,
         onBack = onBack,
@@ -139,7 +219,8 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onSave: (Boolean, String, String, String, String, String, String) -> Unit,
+    onSave: (Boolean, String, String, String, String, String) -> Unit,
+    onSaveAndTest: (Boolean, String, String, String, String, String) -> Unit,
     onRefreshLocalSpeech: (String) -> Unit,
     onInstallLocalSpeech: (String) -> Unit,
     onBack: () -> Unit,
@@ -149,13 +230,34 @@ fun SettingsScreen(
     val cloudCredentials = state.cloudCredentials
 
     var cloudState by remember(settings.cloudAnalysisEnabled) { mutableStateOf(settings.cloudAnalysisEnabled) }
-    var backendState by remember(settings.backendBaseUrl) { mutableStateOf(settings.backendBaseUrl) }
     var languageState by remember(settings.languageTag) { mutableStateOf(settings.languageTag) }
     var apiKeyState by remember(cloudCredentials.apiKey) { mutableStateOf(cloudCredentials.apiKey) }
     var analysisModelState by remember(cloudCredentials.analysisModel) { mutableStateOf(cloudCredentials.analysisModel) }
     var questionModelState by remember(cloudCredentials.questionModel) { mutableStateOf(cloudCredentials.questionModel) }
     var transcribeModelState by remember(cloudCredentials.transcribeModel) { mutableStateOf(cloudCredentials.transcribeModel) }
     var showApiKey by remember { mutableStateOf(false) }
+
+    fun submitSave() {
+        onSave(
+            cloudState,
+            languageState,
+            apiKeyState,
+            analysisModelState,
+            questionModelState,
+            transcribeModelState,
+        )
+    }
+
+    fun submitSaveAndTest() {
+        onSaveAndTest(
+            cloudState,
+            languageState,
+            apiKeyState,
+            analysisModelState,
+            questionModelState,
+            transcribeModelState,
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -170,19 +272,6 @@ fun SettingsScreen(
             onCheckedChange = { cloudState = it },
             supportingText = stringResource(R.string.settings_cloud_subtitle),
         )
-
-        HeadacheInsightSectionCard(
-            title = stringResource(R.string.settings_backend_title),
-            supportingText = stringResource(R.string.settings_backend_subtitle),
-        ) {
-            OutlinedTextField(
-                value = backendState,
-                onValueChange = { backendState = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.settings_backend_label)) },
-                singleLine = true,
-            )
-        }
 
         HeadacheInsightSectionCard(
             title = stringResource(R.string.settings_openai_title),
@@ -212,6 +301,7 @@ fun SettingsScreen(
                     )
                 }
             }
+            ConnectionStatusBlock(state = state)
         }
 
         HeadacheInsightSectionCard(
@@ -282,17 +372,20 @@ fun SettingsScreen(
         }
 
         Button(
-            onClick = {
-                onSave(
-                    cloudState,
-                    backendState,
-                    languageState,
-                    apiKeyState,
-                    analysisModelState,
-                    questionModelState,
-                    transcribeModelState,
-                )
-            },
+            onClick = ::submitSaveAndTest,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.connectionState != ConnectionCheckState.TESTING,
+        ) {
+            Text(
+                if (state.connectionState == ConnectionCheckState.TESTING) {
+                    stringResource(R.string.settings_connection_testing)
+                } else {
+                    stringResource(R.string.settings_save_and_test)
+                },
+            )
+        }
+        OutlinedButton(
+            onClick = ::submitSave,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.settings_save))
@@ -301,6 +394,47 @@ fun SettingsScreen(
             onBack = onBack,
             onHome = onHome,
         )
+    }
+}
+
+@Composable
+private fun ConnectionStatusBlock(
+    state: SettingsUiState,
+) {
+    val badgeColor = when (state.connectionState) {
+        ConnectionCheckState.SUCCESS -> HeadacheInsightStatusColors.LocalComplete
+        ConnectionCheckState.ERROR -> HeadacheInsightStatusColors.Warning
+        ConnectionCheckState.TESTING -> HeadacheInsightStatusColors.CloudAnalyzed
+        ConnectionCheckState.IDLE -> HeadacheInsightStatusColors.Queued
+    }
+    val badgeLabel = when (state.connectionState) {
+        ConnectionCheckState.SUCCESS -> stringResource(R.string.settings_connection_success)
+        ConnectionCheckState.ERROR -> stringResource(R.string.settings_connection_error)
+        ConnectionCheckState.TESTING -> stringResource(R.string.settings_connection_testing)
+        ConnectionCheckState.IDLE -> stringResource(R.string.settings_connection_idle)
+    }
+    HeadacheInsightStatusBadge(
+        label = badgeLabel,
+        color = badgeColor,
+    )
+    state.connectionStatus?.let { status ->
+        Text(stringResource(R.string.settings_connection_service, status.serviceName))
+        Text(stringResource(R.string.settings_connection_models, status.analysisModel, status.questionModel, status.transcribeModel))
+        Text(
+            if (status.apiKeyPresent) {
+                stringResource(R.string.settings_connection_key_present)
+            } else {
+                stringResource(R.string.settings_connection_key_missing)
+            },
+            color = if (status.apiKeyPresent) {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.outline
+            },
+        )
+    }
+    state.connectionErrorMessage?.let { message ->
+        Text(stringResource(R.string.settings_connection_error_message, message))
     }
 }
 

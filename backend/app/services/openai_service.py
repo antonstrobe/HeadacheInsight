@@ -22,9 +22,11 @@ class OpenAIService:
         self.analysis_prompt = load_prompt(settings.prompt_dir / "analysis_system.md")
         self.questions_prompt = load_prompt(settings.prompt_dir / "follow_up_system.md")
         self.attachments_prompt = load_prompt(settings.prompt_dir / "attachments_system.md")
+        self.voice_intake_prompt = load_prompt(settings.prompt_dir / "voice_intake_system.md")
         self.analysis_schema = load_schema(settings.schema_dir / "analysis_response.schema.json")
         self.question_schema = load_schema(settings.schema_dir / "question_template_list.schema.json")
         self.attachments_schema = load_schema(settings.schema_dir / "attachment_analysis.schema.json")
+        self.voice_intake_schema = load_schema(settings.schema_dir / "voice_intake_draft.schema.json")
 
     def _client(self, overrides: OpenAIRequestOverrides | None = None) -> OpenAI:
         api_key = overrides.api_key if overrides and overrides.api_key else settings.openai_api_key
@@ -83,6 +85,16 @@ class OpenAIService:
             prompt=self.attachments_prompt,
             schema_name="attachment_analysis",
             schema=self.attachments_schema,
+            payload=payload,
+            overrides=overrides,
+        )
+
+    def voice_intake_draft(self, payload: dict, overrides: OpenAIRequestOverrides | None = None) -> dict:
+        return self._json_response(
+            model=overrides.analysis_model if overrides and overrides.analysis_model else settings.openai_analysis_model,
+            prompt=self.voice_intake_prompt,
+            schema_name="voice_intake_draft",
+            schema=self.voice_intake_schema,
             payload=payload,
             overrides=overrides,
         )

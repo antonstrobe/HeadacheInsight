@@ -1,6 +1,6 @@
 <resources>
     <string name="quicklog_title">Быстрый режим</string>
-    <string name="quicklog_subtitle">Сохраните частичную запись сейчас и вернитесь к деталям позже.</string>
+    <string name="quicklog_subtitle">Говорите свободно: приложение показывает живой текст и само собирает черновик эпизода по мере речи.</string>
     <string name="quicklog_episode_id">Эпизод: %1$s</string>
     <string name="quicklog_episode_creating">создаётся...</string>
     <string name="quicklog_symptoms_title">Симптомы</string>
@@ -9,8 +9,8 @@
     <string name="quicklog_red_flag_confusion">Спутанность сознания</string>
     <string name="quicklog_red_flag_speech">Нарушение речи</string>
     <string name="quicklog_red_flag_weakness">Слабость с одной стороны</string>
-    <string name="quicklog_notes_title">Что вы чувствуете прямо сейчас?</string>
-    <string name="quicklog_notes_label">Короткая заметка или текст из диктовки</string>
+    <string name="quicklog_notes_title">Краткое описание и лекарства</string>
+    <string name="quicklog_notes_label">Короткое структурированное описание</string>
     <string name="quicklog_medication_title">Лекарства</string>
     <string name="quicklog_medication_label">Что уже приняли?</string>
     <string name="quicklog_dictation_start">Начать офлайн-диктовку</string>
@@ -18,10 +18,20 @@
     <string name="quicklog_dictation_prompt">Опишите, что вы чувствуете</string>
     <string name="quicklog_dictation_saved">Диктовка сохранена: %1$s</string>
     <string name="quicklog_dictation_unavailable">Офлайн-диктовка недоступна на этом устройстве.</string>
-    <string name="quicklog_voice_start">Начать аудиозаметку</string>
-    <string name="quicklog_voice_stop">Остановить аудиозаметку</string>
+    <string name="quicklog_voice_start">Начать голосовое заполнение</string>
+    <string name="quicklog_voice_stop">Остановить голосовое заполнение</string>
     <string name="quicklog_save_now">Сохранить сейчас</string>
     <string name="quicklog_audio_saved">Аудио сохранено: %1$s</string>
     <string name="quicklog_audio_permission_required">Для голосового ввода нужен доступ к микрофону.</string>
     <string name="quicklog_voice_error">Ошибка голосового ввода: %1$s</string>
+    <string name="quicklog_voice_error_code">Ошибка голосового ввода (код %1$d)</string>
+    <string name="quicklog_live_title">Живой текст</string>
+    <string name="quicklog_live_subtitle">Здесь появляются последние фразы, чтобы было видно, что распознавание и обновление через сервер работают.</string>
+    <string name="quicklog_live_empty">Запустите голосовое заполнение, чтобы увидеть живой текст.</string>
+    <string name="quicklog_detected_title">Распознано по голосу</string>
+    <string name="quicklog_detected_subtitle">Эти поля собираются из структурированного JSON, который обновляется во время речи.</string>
+    <string name="quicklog_voice_status_idle">Голосовой режим выключен</string>
+    <string name="quicklog_voice_status_listening">Слушаю</string>
+    <string name="quicklog_voice_status_processing">Обновляю черновик</string>
+    <string name="quicklog_voice_status_listening_processing">Слушаю и обновляю</string>
 </resources>

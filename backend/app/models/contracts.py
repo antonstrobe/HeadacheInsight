@@ -62,3 +62,38 @@ class AnalyzeAttachmentsResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: str = "headacheinsight-backend"
+
+
+class ConnectionTestResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    service: str = "headacheinsight-backend"
+    api_key_present: bool
+    analysis_model: str
+    question_model: str
+    transcribe_model: str
+
+
+class VoiceIntakeDraftRequest(BaseModel):
+    owner_id: str
+    locale: str
+    transcript_text: str
+
+
+class VoiceIntakeField(BaseModel):
+    section: str
+    label: str
+    value: str
+
+
+class VoiceIntakeDraftResponse(BaseModel):
+    schema_version: str = "v1"
+    owner_id: str
+    transcript_text: str
+    summary_text: str
+    severity: int | None = Field(default=None, ge=0, le=10)
+    symptoms: list[str] = Field(default_factory=list)
+    red_flags: list[Literal["suddenWorstPain", "confusion", "speechDifficulty", "oneSidedWeakness"]] = Field(default_factory=list)
+    medications: list[str] = Field(default_factory=list)
+    live_notes: list[str] = Field(default_factory=list)
+    dynamic_fields: list[VoiceIntakeField] = Field(default_factory=list)
+    engine_name: str

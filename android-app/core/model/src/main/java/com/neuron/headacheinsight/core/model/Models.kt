@@ -293,6 +293,38 @@ data class CloudCredentials(
         get() = apiKey.isNotBlank()
 }
 
+@Serializable
+data class BackendConnectionStatus(
+    val status: String = "ok",
+    @SerialName("service") val serviceName: String,
+    @SerialName("api_key_present") val apiKeyPresent: Boolean,
+    @SerialName("analysis_model") val analysisModel: String,
+    @SerialName("question_model") val questionModel: String,
+    @SerialName("transcribe_model") val transcribeModel: String,
+)
+
+@Serializable
+data class VoiceIntakeField(
+    val section: String,
+    val label: String,
+    val value: String,
+)
+
+@Serializable
+data class VoiceIntakeDraft(
+    @SerialName("schema_version") val schemaVersion: String = "v1",
+    @SerialName("owner_id") val ownerId: String,
+    @SerialName("transcript_text") val transcriptText: String,
+    @SerialName("summary_text") val summaryText: String,
+    val severity: Int? = null,
+    val symptoms: List<String> = emptyList(),
+    @SerialName("red_flags") val redFlags: List<String> = emptyList(),
+    val medications: List<String> = emptyList(),
+    @SerialName("live_notes") val liveNotes: List<String> = emptyList(),
+    @SerialName("dynamic_fields") val dynamicFields: List<VoiceIntakeField> = emptyList(),
+    @SerialName("engine_name") val engineName: String = "local-rule",
+)
+
 enum class LocalSpeechPackStatus {
     UNKNOWN,
     CHECKING,

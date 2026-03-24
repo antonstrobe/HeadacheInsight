@@ -1,25 +1,10 @@
 package com.neuron.headacheinsight.data.remote
 
-import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.Attachment
 import com.neuron.headacheinsight.core.model.EpisodeDetail
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-@Serializable
-data class ClientRegisterRequest(
-    @SerialName("install_id") val installId: String,
-    @SerialName("public_key") val publicKey: String,
-    @SerialName("device_locale") val deviceLocale: String,
-    @SerialName("device_timezone") val deviceTimezone: String,
-)
-
-@Serializable
-data class ClientRegisterResponse(
-    @SerialName("client_id") val clientId: String,
-    val accepted: Boolean,
-)
 
 @Serializable
 data class AnalyzeEpisodeRequest(
@@ -51,9 +36,10 @@ data class AnalyzeAttachmentsRequest(
 )
 
 @Serializable
-data class AnalyzeAttachmentsResponse(
+data class VoiceIntakeDraftRequest(
     @SerialName("owner_id") val ownerId: String,
-    val summary: List<String>,
+    val locale: String,
+    @SerialName("transcript_text") val transcriptText: String,
 )
 
 @Serializable
@@ -64,16 +50,52 @@ data class TranscribeMetadata(
 )
 
 @Serializable
-data class TranscribeResponse(
-    @SerialName("episode_id") val episodeId: String,
-    @SerialName("language") val language: String? = null,
-    @SerialName("transcript_text") val transcriptText: String,
-    @SerialName("confidence") val confidence: Double? = null,
-    @SerialName("engine_type") val engineType: String,
+data class OpenAiChatCompletionRequest(
+    val model: String,
+    val messages: List<OpenAiChatMessage>,
+    @SerialName("response_format") val responseFormat: OpenAiResponseFormat = OpenAiResponseFormat(),
+    val temperature: Double? = null,
 )
 
 @Serializable
-data class HealthResponse(
-    val status: String,
-    @SerialName("service") val serviceName: String,
+data class OpenAiChatMessage(
+    val role: String,
+    val content: String,
+)
+
+@Serializable
+data class OpenAiResponseFormat(
+    val type: String = "json_object",
+)
+
+@Serializable
+data class OpenAiChatCompletionResponse(
+    val id: String? = null,
+    val choices: List<OpenAiChoice> = emptyList(),
+)
+
+@Serializable
+data class OpenAiChoice(
+    val message: OpenAiAssistantMessage,
+)
+
+@Serializable
+data class OpenAiAssistantMessage(
+    val content: String? = null,
+)
+
+@Serializable
+data class OpenAiModelListResponse(
+    val data: List<OpenAiModelSummary> = emptyList(),
+)
+
+@Serializable
+data class OpenAiModelSummary(
+    val id: String,
+)
+
+@Serializable
+data class OpenAiTranscriptionResponse(
+    val text: String,
+    val language: String? = null,
 )

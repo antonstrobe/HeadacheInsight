@@ -38,6 +38,24 @@ def test_health() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_connection_test_echoes_models() -> None:
+    client = TestClient(app)
+    response = client.get(
+        "/api/connection-test",
+        headers={
+            "X-OpenAI-Api-Key": "sk-test",
+            "X-OpenAI-Analysis-Model": "gpt-analysis",
+            "X-OpenAI-Question-Model": "gpt-question",
+            "X-OpenAI-Transcribe-Model": "gpt-transcribe",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["api_key_present"] is True
+    assert response.json()["analysis_model"] == "gpt-analysis"
+    assert response.json()["question_model"] == "gpt-question"
+    assert response.json()["transcribe_model"] == "gpt-transcribe"
+
+
 def test_register_and_signed_analysis(monkeypatch) -> None:
     sample_payload = json.loads((Path(__file__).parent / "fixtures" / "sample_episode_request.json").read_text(encoding="utf-8"))
     private_key = Ed25519PrivateKey.generate()
@@ -91,3 +109,51 @@ def test_register_and_signed_analysis(monkeypatch) -> None:
     )
     assert response.status_code == 200
     assert response.json()["analysis_id"] == "analysis-1"
+
+
+def test_signed_voice_intake_draft(monkeypatch) -> None:
+    private_key = Ed25519PrivateKey.generate()
+    public_key_b64 = base64.b64encode(private_key.public_key().public_bytes_raw()).decode()
+    install_id = f"install-test-{uuid.uuid4()}"
+    client = TestClient(app)
+    register_client(client, install_id, public_key_b64)
+
+    monkeypatch.setattr(service, "voice_intake_draft", lambda payload, overrides=None: {
+        "schema_version": "v1",
+        "owner_id": payload["owner_id"],
+        "transcript_text": payload["transcript_text"],
+        "summary_text": "Strong headache with nausea.",
+        "severity": 8,
+        "symptoms": ["Nausea", "Light sensitivity"],
+        "red_flags": [],
+        "medications": ["Ibuprofen"],
+        "live_notes": ["Strong headache", "Nausea"],
+        "dynamic_fields": [{"section": "symptoms", "label": "Nausea", "value": "detected"}],
+        "engine_name": "cloud-openai",
+    })
+
+    body = json.dumps(
+        {
+            "owner_id": "episode-voice-1",
+            "locale": "ru-RU",
+            "transcript_text": "Сильно болит голова и тошнит.",
+        },
+    ).encode()
+    timestamp = str(int(time.time() * 1000))
+    nonce = f"nonce-{uuid.uuid4()}"
+    body_hash, signature = sign_request(private_key, "POST", "/api/voice-intake-draft", body, timestamp, nonce)
+    response = client.post(
+        "/api/voice-intake-draft",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Install-Id": install_id,
+            "X-Timestamp": timestamp,
+            "X-Nonce": nonce,
+            "X-Body-SHA256": body_hash,
+            "X-Signature": signature,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["summary_text"] == "Strong headache with nausea."
+    assert response.json()["medications"] == ["Ibuprofen"]

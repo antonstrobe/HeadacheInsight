@@ -138,7 +138,7 @@ try {
         Write-Host "Размер: $($sourceBitmap.Width)x$($sourceBitmap.Height)" -ForegroundColor Green
 
         Write-Section "Генерация adaptive icon foreground"
-        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath $AdaptiveForegroundPath -CanvasSize 432 -PaddingRatio 0.08
+        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath $AdaptiveForegroundPath -CanvasSize 432 -PaddingRatio 0.16
         Update-AdaptiveIconXml -Directory $AdaptiveXmlDir
         Update-ColorResource -Path $ColorsPath -ColorHex $BackgroundColor
 
@@ -152,14 +152,14 @@ try {
         )
         foreach ($density in $densities) {
             $targetDir = Join-Path $ResRoot $density.Directory
-            Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $targetDir "ic_launcher.png") -CanvasSize $density.Size -PaddingRatio 0.10
-            Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $targetDir "ic_launcher_round.png") -CanvasSize $density.Size -PaddingRatio 0.10
+            Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $targetDir "ic_launcher.png") -CanvasSize $density.Size -PaddingRatio 0.18
+            Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $targetDir "ic_launcher_round.png") -CanvasSize $density.Size -PaddingRatio 0.18
         }
 
         Write-Section "Экспорт preview"
         Ensure-Directory $ExportRoot
-        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $ExportRoot "app-icon-play-store-512.png") -CanvasSize 512 -PaddingRatio 0.04
-        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $ExportRoot "app-icon-preview-256.png") -CanvasSize 256 -PaddingRatio 0.08
+        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $ExportRoot "app-icon-play-store-512.png") -CanvasSize 512 -PaddingRatio 0.10
+        Save-PngVariant -SourceBitmap $sourceBitmap -DestinationPath (Join-Path $ExportRoot "app-icon-preview-256.png") -CanvasSize 256 -PaddingRatio 0.16
 
         Write-Host ""
         Write-Host "Иконки сгенерированы." -ForegroundColor Green

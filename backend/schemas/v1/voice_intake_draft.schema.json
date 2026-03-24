@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner_id",
+    "transcript_text",
+    "summary_text",
+    "severity",
+    "symptoms",
+    "red_flags",
+    "medications",
+    "live_notes",
+    "dynamic_fields",
+    "engine_name"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "owner_id": { "type": "string" },
+    "transcript_text": { "type": "string" },
+    "summary_text": { "type": "string" },
+    "severity": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 10
+    },
+    "symptoms": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "red_flags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "suddenWorstPain",
+          "confusion",
+          "speechDifficulty",
+          "oneSidedWeakness"
+        ]
+      }
+    },
+    "medications": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "live_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dynamic_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section", "label", "value"],
+        "properties": {
+          "section": { "type": "string" },
+          "label": { "type": "string" },
+          "value": { "type": "string" }
+        }
+      }
+    },
+    "engine_name": { "type": "string" }
+  }
+}

@@ -21,15 +21,20 @@ private val CalmSlate = Color(0xFF98A2B3)
 private val SoftText = Color(0xFFF2F4F7)
 private val EmergencyRed = Color(0xFFD14343)
 private val RecoveryGreen = Color(0xFF4DAA57)
-private val AnalysisViolet = Color(0xFF7662D9)
+private val ActionMauve = Color(0xFF7C788F)
+private val ActionMauveContainer = Color(0xFF2A2637)
+private val ActionFog = Color(0xFFE4E0F1)
+private val AnalysisViolet = Color(0xFF8A84B5)
 private val QueueGray = Color(0xFF667085)
 private val WarningOrange = Color(0xFFF79009)
 private val Mist = Color(0xFFE8ECF3)
 
 val HeadacheInsightDarkScheme: ColorScheme = darkColorScheme(
-    primary = EmergencyRed,
+    primary = ActionMauve,
     onPrimary = Color.White,
     secondary = AnalysisViolet,
+    secondaryContainer = ActionMauveContainer,
+    onSecondaryContainer = SoftText,
     tertiary = RecoveryGreen,
     background = DeepNight,
     surface = NightPanel,
@@ -39,9 +44,11 @@ val HeadacheInsightDarkScheme: ColorScheme = darkColorScheme(
 )
 
 val HeadacheInsightLightScheme: ColorScheme = lightColorScheme(
-    primary = EmergencyRed,
+    primary = ActionMauve,
     onPrimary = Color.White,
     secondary = AnalysisViolet,
+    secondaryContainer = ActionFog,
+    onSecondaryContainer = DeepNight,
     tertiary = RecoveryGreen,
     background = Mist,
     surface = Color.White,

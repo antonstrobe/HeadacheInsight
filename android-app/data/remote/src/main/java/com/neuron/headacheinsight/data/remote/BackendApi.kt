@@ -1,6 +1,5 @@
 package com.neuron.headacheinsight.data.remote
 
-import com.neuron.headacheinsight.core.model.AnalysisResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -10,33 +9,20 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 
 interface BackendApi {
-    @POST("/api/client/register")
-    suspend fun registerClient(
-        @Body request: ClientRegisterRequest,
-    ): ClientRegisterResponse
-
-    @POST("/api/analyze-episode")
-    suspend fun analyzeEpisode(
-        @Body request: AnalyzeEpisodeRequest,
-    ): AnalysisResponse
-
-    @POST("/api/generate-follow-up-questions")
-    suspend fun generateFollowUpQuestions(
-        @Body request: GenerateFollowUpQuestionsRequest,
-    ): GenerateFollowUpQuestionsResponse
-
-    @POST("/api/analyze-attachments")
-    suspend fun analyzeAttachments(
-        @Body request: AnalyzeAttachmentsRequest,
-    ): AnalyzeAttachmentsResponse
+    @POST("/v1/chat/completions")
+    suspend fun createChatCompletion(
+        @Body request: OpenAiChatCompletionRequest,
+    ): OpenAiChatCompletionResponse
 
     @Multipart
-    @POST("/api/transcribe")
+    @POST("/v1/audio/transcriptions")
     suspend fun transcribe(
         @Part file: MultipartBody.Part,
-        @Part("metadata") metadata: RequestBody,
-    ): TranscribeResponse
+        @Part("model") model: RequestBody,
+        @Part("language") language: RequestBody?,
+        @Part("response_format") responseFormat: RequestBody,
+    ): OpenAiTranscriptionResponse
 
-    @GET("/health")
-    suspend fun health(): HealthResponse
+    @GET("/v1/models")
+    suspend fun listModels(): OpenAiModelListResponse
 }

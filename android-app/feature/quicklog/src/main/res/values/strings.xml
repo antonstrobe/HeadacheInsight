@@ -1,6 +1,6 @@
 <resources>
     <string name="quicklog_title">Acute Quick Mode</string>
-    <string name="quicklog_subtitle">Save a partial entry now and return later.</string>
+    <string name="quicklog_subtitle">Speak freely. The app keeps a live transcript and fills the incident draft as you talk.</string>
     <string name="quicklog_episode_id">Episode ID: %1$s</string>
     <string name="quicklog_episode_creating">creating...</string>
     <string name="quicklog_symptoms_title">Symptoms</string>
@@ -9,8 +9,8 @@
     <string name="quicklog_red_flag_confusion">Confusion</string>
     <string name="quicklog_red_flag_speech">Speech difficulty</string>
     <string name="quicklog_red_flag_weakness">One-sided weakness</string>
-    <string name="quicklog_notes_title">What are you feeling right now?</string>
-    <string name="quicklog_notes_label">Short note or dictated text</string>
+    <string name="quicklog_notes_title">Current summary and medication</string>
+    <string name="quicklog_notes_label">Short structured summary</string>
     <string name="quicklog_medication_title">Medication notes</string>
     <string name="quicklog_medication_label">What have you taken?</string>
     <string name="quicklog_dictation_start">Start offline dictation</string>
@@ -18,10 +18,20 @@
     <string name="quicklog_dictation_prompt">Describe what you feel</string>
     <string name="quicklog_dictation_saved">Dictation saved: %1$s</string>
     <string name="quicklog_dictation_unavailable">Offline dictation is unavailable on this device.</string>
-    <string name="quicklog_voice_start">Start audio note</string>
-    <string name="quicklog_voice_stop">Stop audio note</string>
+    <string name="quicklog_voice_start">Start voice fill</string>
+    <string name="quicklog_voice_stop">Stop voice fill</string>
     <string name="quicklog_save_now">Save now</string>
     <string name="quicklog_audio_saved">Audio saved: %1$s</string>
     <string name="quicklog_audio_permission_required">Microphone permission is required for voice input.</string>
     <string name="quicklog_voice_error">Voice input error: %1$s</string>
+    <string name="quicklog_voice_error_code">Voice input error (code %1$d)</string>
+    <string name="quicklog_live_title">Live transcript</string>
+    <string name="quicklog_live_subtitle">Recent speech appears here so you can see that recognition and server updates are working.</string>
+    <string name="quicklog_live_empty">Start voice fill to see live speech here.</string>
+    <string name="quicklog_detected_title">Detected from voice</string>
+    <string name="quicklog_detected_subtitle">These fields are built from the structured JSON draft returned while you speak.</string>
+    <string name="quicklog_voice_status_idle">Voice idle</string>
+    <string name="quicklog_voice_status_listening">Listening now</string>
+    <string name="quicklog_voice_status_processing">Updating draft</string>
+    <string name="quicklog_voice_status_listening_processing">Listening and updating</string>
 </resources>

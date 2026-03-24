@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,9 +84,10 @@ fun HeadacheInsightPrimaryPainButton(
 ) {
     Button(
         onClick = onClick,
+        colors = headacheInsightActionButtonColors(),
         modifier = modifier
             .fillMaxWidth()
-            .height(84.dp),
+            .height(78.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -110,3 +113,9 @@ fun KeyValueLine(
         Text(text = value, style = MaterialTheme.typography.bodyLarge)
     }
 }
+
+@Composable
+fun headacheInsightActionButtonColors(): ButtonColors = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+)

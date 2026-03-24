@@ -32,6 +32,7 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightPrimaryPainBu
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusBadge
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
+import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
 import com.neuron.headacheinsight.domain.ObserveHomeDashboardUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -119,18 +120,18 @@ fun HomeScreen(
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    state.pendingEpisode?.let { pending ->
-                        Button(
-                            onClick = { onContinueEpisode(pending.id) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.home_continue_episode),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
+                    Button(
+                        onClick = { state.pendingEpisode?.id?.let(onContinueEpisode) },
+                        enabled = state.pendingEpisode != null,
+                        colors = headacheInsightActionButtonColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_continue_episode),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                     }
                     HeadacheInsightPrimaryPainButton(
                         label = stringResource(R.string.home_pain_button),
@@ -242,6 +243,7 @@ private fun HomeActionButton(
     Button(
         onClick = onClick,
         enabled = enabled,
+        colors = headacheInsightActionButtonColors(),
         modifier = modifier.height(64.dp),
     ) {
         Text(

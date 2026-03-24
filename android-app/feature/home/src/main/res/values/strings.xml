@@ -10,7 +10,7 @@
     <string name="home_local_only">Local only</string>
     <string name="home_queue_count">Queue %1$d</string>
     <string name="home_monthly_headache_days">Monthly headache days: %1$d</string>
-    <string name="home_continue_episode">Continue unfinished entry</string>
+    <string name="home_continue_episode">Continue open items</string>
     <string name="home_history">History</string>
     <string name="home_profile">Profile</string>
     <string name="home_attachments">Attachments / results</string>
