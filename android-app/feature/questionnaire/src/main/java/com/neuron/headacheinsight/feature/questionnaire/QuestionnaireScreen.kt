@@ -1,9 +1,11 @@
 package com.neuron.headacheinsight.feature.questionnaire
 
 import android.Manifest
-import android.app.Activity
+import android.os.Build
+import android.os.Bundle
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -368,8 +371,11 @@ private fun QuestionEditorCard(
     val multiValue = remember(question.id) { mutableStateListOf<String>() }
     var scaleValue by remember(question.id) { mutableStateOf(5f) }
     var voiceError by remember(question.id) { mutableStateOf<String?>(null) }
+    var voiceListening by remember(question.id) { mutableStateOf(false) }
+    var voiceRecognizer by remember(question.id) { mutableStateOf<SpeechRecognizer?>(null) }
 
     val voiceFillLabel = stringResource(R.string.questionnaire_voice_fill)
+    val voiceListeningLabel = stringResource(R.string.questionnaire_voice_listening)
     val voicePermissionRequired = stringResource(R.string.questionnaire_voice_permission_required)
     val voiceUnavailable = stringResource(R.string.questionnaire_voice_unavailable)
     val voiceEmptyResult = stringResource(R.string.questionnaire_voice_empty_result)
@@ -377,6 +383,23 @@ private fun QuestionEditorCard(
     val voiceOptionError = stringResource(R.string.questionnaire_voice_option_error)
     val voiceNumberError = stringResource(R.string.questionnaire_voice_number_error)
     val voiceScaleError = stringResource(R.string.questionnaire_voice_scale_error)
+    val voiceErrorCode = stringResource(R.string.questionnaire_voice_error_code)
+    val optionLabels = remember(question.options, voiceLanguageTag) {
+        question.options.associateWith { option -> localizedQuestionOptionLabel(option, voiceLanguageTag) }
+    }
+
+    fun destroyVoiceRecognizer() {
+        voiceRecognizer?.cancel()
+        voiceRecognizer?.destroy()
+        voiceRecognizer = null
+    }
+
+    DisposableEffect(question.id) {
+        onDispose {
+            voiceRecognizer?.cancel()
+            voiceRecognizer?.destroy()
+        }
+    }
 
     val canSave = when (question.answerType) {
         AnswerType.BOOLEAN -> booleanValue != null || !question.required
@@ -445,7 +468,7 @@ private fun QuestionEditorCard(
                     singleValue = transcript
                     null
                 } else {
-                    val matched = matchSingleVoiceOption(transcript, question.options)
+                    val matched = matchSingleVoiceOption(transcript, question.options, voiceLanguageTag)
                     if (matched == null) {
                         voiceOptionError
                     } else {
@@ -460,7 +483,7 @@ private fun QuestionEditorCard(
                     textValue = transcript
                     null
                 } else {
-                    val matched = matchMultiVoiceOptions(transcript, question.options)
+                    val matched = matchMultiVoiceOptions(transcript, question.options, voiceLanguageTag)
                     if (matched.isEmpty()) {
                         voiceOptionError
                     } else {
@@ -488,35 +511,82 @@ private fun QuestionEditorCard(
         }
     }
 
-    val voiceRecognitionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
-        val transcript = result.data
-            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            .orEmpty()
-        voiceError = applyVoiceTranscript(transcript)
-    }
-
     fun launchVoiceRecognition() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        val useOnDeviceRecognizer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        val recognitionAvailable = useOnDeviceRecognizer || SpeechRecognizer.isRecognitionAvailable(context)
+        if (!recognitionAvailable) {
             voiceError = voiceUnavailable
             return
         }
+
+        destroyVoiceRecognizer()
+        val recognizer = runCatching {
+            if (useOnDeviceRecognizer) {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } else {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }
+        }.getOrElse {
+            voiceError = voiceUnavailable
+            return
+        }
+
+        voiceRecognizer = recognizer
+        voiceListening = true
+        voiceError = null
+
+        recognizer.setRecognitionListener(
+            object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) = Unit
+
+                override fun onBeginningOfSpeech() = Unit
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+                override fun onEndOfSpeech() = Unit
+
+                override fun onError(error: Int) {
+                    voiceListening = false
+                    voiceError = mapVoiceRecognitionError(
+                        errorCode = error,
+                        unavailableLabel = voiceUnavailable,
+                        emptyResultLabel = voiceEmptyResult,
+                        errorCodeLabel = voiceErrorCode,
+                    )
+                    destroyVoiceRecognizer()
+                }
+
+                override fun onResults(results: Bundle?) {
+                    voiceListening = false
+                    voiceError = applyVoiceTranscript(extractVoiceTranscript(results))
+                    destroyVoiceRecognizer()
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            },
+        )
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguageTag)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, voiceLanguageTag)
             putExtra(RecognizerIntent.EXTRA_PROMPT, question.prompt)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, useOnDeviceRecognizer)
         }
-        if (intent.resolveActivity(context.packageManager) == null) {
-            voiceError = voiceUnavailable
-            return
-        }
-        runCatching { voiceRecognitionLauncher.launch(intent) }
-            .onFailure { voiceError = voiceUnavailable }
+
+        runCatching { recognizer.startListening(intent) }
+            .onFailure {
+                voiceListening = false
+                voiceError = voiceUnavailable
+                destroyVoiceRecognizer()
+            }
     }
 
     val voicePermissionLauncher = rememberLauncherForActivityResult(
@@ -627,7 +697,7 @@ private fun QuestionEditorCard(
                                     singleValue = option
                                     voiceError = null
                                 },
-                                label = { Text(option) },
+                                label = { Text(optionLabels[option] ?: option) },
                             )
                         }
                     }
@@ -662,7 +732,7 @@ private fun QuestionEditorCard(
                                     }
                                     voiceError = null
                                 },
-                                label = { Text(option) },
+                                label = { Text(optionLabels[option] ?: option) },
                             )
                         }
                     }
@@ -714,9 +784,10 @@ private fun QuestionEditorCard(
             if (question.voiceAllowed) {
                 TextButton(
                     onClick = ::startVoiceFill,
+                    enabled = !voiceListening,
                     modifier = Modifier.padding(end = 8.dp),
                 ) {
-                    Text(voiceFillLabel)
+                    Text(if (voiceListening) voiceListeningLabel else voiceFillLabel)
                 }
             }
             TextButton(onClick = { saveCurrentAnswer() }, enabled = canSave) {
@@ -821,6 +892,7 @@ private fun parseIntegerVoiceAnswer(transcript: String): Int? {
 private fun matchSingleVoiceOption(
     transcript: String,
     options: List<String>,
+    languageTag: String,
 ): String? {
     val spokenIndex = parseIntegerVoiceAnswer(transcript)
     if (spokenIndex != null && spokenIndex in 1..options.size) {
@@ -830,7 +902,7 @@ private fun matchSingleVoiceOption(
     val normalizedTranscript = normalizeVoiceText(transcript)
     val transcriptTokens = normalizedTranscript.split(' ').filter(String::isNotBlank).toSet()
     val scoredMatches = options
-        .map { option -> option to scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option) }
+        .map { option -> option to scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option, languageTag) }
         .filter { (_, score) -> score > 0 }
     val best = scoredMatches.maxByOrNull { (_, score) -> score } ?: return null
     val bestScore = best.second
@@ -843,11 +915,12 @@ private fun matchSingleVoiceOption(
 private fun matchMultiVoiceOptions(
     transcript: String,
     options: List<String>,
+    languageTag: String,
 ): List<String> {
     val normalizedTranscript = normalizeVoiceText(transcript)
     val transcriptTokens = normalizedTranscript.split(' ').filter(String::isNotBlank).toSet()
     return options.filter { option ->
-        scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option) > 0
+        scoreVoiceOptionMatch(normalizedTranscript, transcriptTokens, option, languageTag) > 0
     }
 }
 
@@ -855,14 +928,22 @@ private fun scoreVoiceOptionMatch(
     normalizedTranscript: String,
     transcriptTokens: Set<String>,
     option: String,
+    languageTag: String,
 ): Int {
-    val normalizedOption = normalizeVoiceText(option)
-    if (normalizedOption.isBlank()) return 0
-    if (normalizedTranscript == normalizedOption) return 4
-    if (normalizedTranscript.contains(normalizedOption)) return 3
-    if (normalizedOption.contains(normalizedTranscript)) return 2
-    val optionTokens = normalizedOption.split(' ').filter(String::isNotBlank)
-    return if (optionTokens.isNotEmpty() && optionTokens.all(transcriptTokens::contains)) 1 else 0
+    return optionCandidatePhrases(option, languageTag)
+        .map(::normalizeVoiceText)
+        .filter(String::isNotBlank)
+        .maxOfOrNull { normalizedOption ->
+            when {
+                normalizedTranscript == normalizedOption -> 4
+                normalizedTranscript.contains(normalizedOption) -> 3
+                normalizedOption.contains(normalizedTranscript) -> 2
+                else -> {
+                    val optionTokens = normalizedOption.split(' ').filter(String::isNotBlank)
+                    if (optionTokens.isNotEmpty() && optionTokens.all(transcriptTokens::contains)) 1 else 0
+                }
+            }
+        } ?: 0
 }
 
 private fun normalizeVoiceText(value: String): String =
@@ -877,3 +958,154 @@ private fun splitVoiceListItems(value: String): List<String> =
         .map(String::trim)
         .filter(String::isNotBlank)
         .distinct()
+
+private fun extractVoiceTranscript(results: Bundle?): String =
+    results
+        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        ?.firstOrNull()
+        .orEmpty()
+
+private fun mapVoiceRecognitionError(
+    errorCode: Int,
+    unavailableLabel: String,
+    emptyResultLabel: String,
+    errorCodeLabel: String,
+): String = when (errorCode) {
+    SpeechRecognizer.ERROR_NO_MATCH,
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> emptyResultLabel
+    SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+    SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> unavailableLabel
+    else -> String.format(errorCodeLabel, errorCode)
+}
+
+private fun localizedQuestionOptionLabel(
+    option: String,
+    languageTag: String,
+): String {
+    QuestionOptionLabels[option]?.get(languageTag.substringBefore('-').lowercase(Locale.ROOT))?.let { return it }
+
+    val tokens = option.split('_').filter(String::isNotBlank)
+    if (tokens.isEmpty()) return option
+    if (!tokens.all { token -> token.all(Char::isLetterOrDigit) }) return option
+
+    return if (languageTag.startsWith("ru", ignoreCase = true)) {
+        tokens
+            .map { token -> QuestionOptionRuTokens[token.lowercase(Locale.ROOT)] ?: token }
+            .filter(String::isNotBlank)
+            .joinToString(" ")
+    } else {
+        tokens.joinToString(" ")
+    }
+}
+
+private fun optionCandidatePhrases(
+    option: String,
+    languageTag: String,
+): List<String> {
+    val localized = localizedQuestionOptionLabel(option, languageTag)
+    return buildList {
+        add(option)
+        add(option.replace('_', ' '))
+        add(localized)
+    }.distinct()
+}
+
+private val QuestionOptionRuTokens = mapOf(
+    "just" to "только",
+    "now" to "сейчас",
+    "earlier" to "раньше",
+    "today" to "сегодня",
+    "yesterday" to "вчера",
+    "or" to "или",
+    "before" to "раньше",
+    "sudden" to "внезапно",
+    "gradual" to "постепенно",
+    "unsure" to "не уверен",
+    "forehead" to "лоб",
+    "behind" to "за",
+    "eye" to "глазом",
+    "temples" to "виски",
+    "back" to "задняя часть",
+    "of" to "",
+    "neck" to "шея",
+    "whole" to "вся",
+    "head" to "голова",
+    "left" to "слева",
+    "right" to "справа",
+    "both" to "с обеих сторон",
+    "side" to "сторона",
+    "throbbing" to "пульсирующая",
+    "pressure" to "давящая",
+    "stabbing" to "колющая",
+    "burning" to "жгучая",
+    "tight" to "сжимающая",
+    "band" to "ободом",
+    "usual" to "обычно",
+    "other" to "другое",
+    "unclear" to "неясно",
+    "normal" to "нормально",
+    "than" to "чем",
+    "not" to "не",
+    "applicable" to "применимо",
+    "limited" to "ограниченно",
+    "unable" to "не могу",
+    "different" to "по другому",
+    "1h" to "1 час",
+)
+
+private val QuestionOptionLabels = mapOf(
+    "after_1h" to mapOf("ru" to "через 1 час или позже"),
+    "arm" to mapOf("ru" to "рука"),
+    "back_of_head" to mapOf("ru" to "затылок"),
+    "before_pain" to mapOf("ru" to "до боли"),
+    "behind_eye" to mapOf("ru" to "за глазом"),
+    "both" to mapOf("ru" to "с обеих сторон"),
+    "burning" to mapOf("ru" to "жгучая"),
+    "caffeine" to mapOf("ru" to "кофеин"),
+    "dark_room" to mapOf("ru" to "темная комната"),
+    "earlier_today" to mapOf("ru" to "сегодня раньше"),
+    "face" to mapOf("ru" to "лицо"),
+    "food" to mapOf("ru" to "еда"),
+    "forehead" to mapOf("ru" to "лоб"),
+    "gradual" to mapOf("ru" to "постепенно"),
+    "heat" to mapOf("ru" to "тепло"),
+    "hydration" to mapOf("ru" to "вода"),
+    "ice" to mapOf("ru" to "холод"),
+    "just_now" to mapOf("ru" to "только сейчас"),
+    "left" to mapOf("ru" to "слева"),
+    "left_side" to mapOf("ru" to "левая сторона"),
+    "leg" to mapOf("ru" to "нога"),
+    "less_than_usual" to mapOf("ru" to "меньше обычного"),
+    "limited" to mapOf("ru" to "ограниченно"),
+    "more_than_usual" to mapOf("ru" to "больше обычного"),
+    "much_later" to mapOf("ru" to "намного позже"),
+    "neck" to mapOf("ru" to "шея"),
+    "none" to mapOf("ru" to "нет"),
+    "normal" to mapOf("ru" to "нормально"),
+    "not_applicable" to mapOf("ru" to "неприменимо"),
+    "other" to mapOf("ru" to "другое"),
+    "pressure" to mapOf("ru" to "давящая"),
+    "rest" to mapOf("ru" to "отдых"),
+    "right" to mapOf("ru" to "справа"),
+    "right_side" to mapOf("ru" to "правая сторона"),
+    "safe" to mapOf("ru" to "безопасно"),
+    "slower" to mapOf("ru" to "медленнее"),
+    "somewhat_different" to mapOf("ru" to "немного иначе"),
+    "stabbing" to mapOf("ru" to "колющая"),
+    "stopped" to mapOf("ru" to "остановилась"),
+    "stretching" to mapOf("ru" to "растяжка"),
+    "sudden" to mapOf("ru" to "внезапно"),
+    "temples" to mapOf("ru" to "виски"),
+    "throbbing" to mapOf("ru" to "пульсирующая"),
+    "tight_band" to mapOf("ru" to "сжимающая обручем"),
+    "tongue" to mapOf("ru" to "язык"),
+    "unable" to mapOf("ru" to "не могу"),
+    "unclear" to mapOf("ru" to "неясно"),
+    "unsafe" to mapOf("ru" to "небезопасно"),
+    "unsure" to mapOf("ru" to "не уверен"),
+    "usual" to mapOf("ru" to "обычно"),
+    "very_different" to mapOf("ru" to "совсем иначе"),
+    "whole_head" to mapOf("ru" to "вся голова"),
+    "within_1h" to mapOf("ru" to "в течение часа"),
+    "yesterday_or_before" to mapOf("ru" to "вчера или раньше"),
+)

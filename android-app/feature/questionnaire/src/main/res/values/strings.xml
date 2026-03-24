@@ -24,6 +24,7 @@
     <string name="questionnaire_empty_title">No questions yet</string>
     <string name="questionnaire_empty_subtitle">Generate follow-up questions after you have an active episode with some data.</string>
     <string name="questionnaire_voice_fill">Fill by voice</string>
+    <string name="questionnaire_voice_listening">Listening...</string>
     <string name="questionnaire_voice_permission_required">Microphone permission is required for voice filling.</string>
     <string name="questionnaire_voice_unavailable">Voice filling is unavailable on this device right now.</string>
     <string name="questionnaire_voice_empty_result">No speech was recognized. Try again.</string>
@@ -31,4 +32,5 @@
     <string name="questionnaire_voice_option_error">Could not match the phrase to the available answer options.</string>
     <string name="questionnaire_voice_number_error">Speech was inserted, but the number was not recognized exactly.</string>
     <string name="questionnaire_voice_scale_error">Could not determine a value from 0 to 10.</string>
+    <string name="questionnaire_voice_error_code">Voice recognition error (code %1$d).</string>
 </resources>
