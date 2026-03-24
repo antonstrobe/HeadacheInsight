@@ -12,9 +12,16 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,19 +29,21 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -60,9 +70,11 @@ import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonC
 import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.AnswerType
 import com.neuron.headacheinsight.core.model.EpisodeDetail
+import com.neuron.headacheinsight.core.model.HandPreference
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.EmptyState
+import com.neuron.headacheinsight.core.ui.LocalHandPreference
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.AnalysisRepository
 import com.neuron.headacheinsight.domain.EpisodeRepository
@@ -367,6 +379,7 @@ private fun QuestionEditorCard(
     onSaveAnswer: (String, JsonElement) -> Unit,
 ) {
     val context = LocalContext.current
+    val handPreference = LocalHandPreference.current
     var textValue by remember(question.id) { mutableStateOf("") }
     var booleanValue by remember(question.id) { mutableStateOf<Boolean?>(null) }
     var singleValue by remember(question.id) { mutableStateOf<String?>(null) }
@@ -412,6 +425,25 @@ private fun QuestionEditorCard(
     }
     val voiceTranscriptText = mergeVoiceTranscript(voiceSegments, voiceLiveSegment)
     val showVoiceTranscriptField = question.voiceAllowed && (!hasPrimaryTextInput || voiceTranscriptText.isNotBlank() || voiceSessionActive)
+    val voicePulseTransition = rememberInfiniteTransition(label = "questionnaire-voice-button")
+    val voicePulseProgress by voicePulseTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "questionnaire-voice-button-pulse",
+    )
+    val idleVoiceContainerColor = MaterialTheme.colorScheme.secondaryContainer
+    val activeVoiceContainerColor = lerp(
+        idleVoiceContainerColor,
+        HeadacheInsightStatusColors.Emergency.copy(alpha = 0.9f),
+        voicePulseProgress,
+    )
+    val actionButtonModifier = Modifier
+        .widthIn(min = 124.dp)
+        .defaultMinSize(minHeight = 48.dp)
 
     fun destroyVoiceRecognizer() {
         voiceHandler.removeCallbacksAndMessages(null)
@@ -576,6 +608,7 @@ private fun QuestionEditorCard(
     launchVoiceRecognition = launch@{
         val useOnDeviceRecognizer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        val useSegmentedSession = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
         val recognitionAvailable = useOnDeviceRecognizer || SpeechRecognizer.isRecognitionAvailable(context)
         if (!recognitionAvailable) {
             voiceSessionActive = false
@@ -608,16 +641,21 @@ private fun QuestionEditorCard(
             object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     voiceReconnectAttempts = 0
+                    voiceListening = true
                 }
 
-                override fun onBeginningOfSpeech() = Unit
+                override fun onBeginningOfSpeech() {
+                    voiceListening = true
+                }
 
                 override fun onRmsChanged(rmsdB: Float) = Unit
 
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
                 override fun onEndOfSpeech() {
-                    voiceListening = false
+                    if (!useSegmentedSession) {
+                        voiceListening = false
+                    }
                 }
 
                 override fun onError(error: Int) {
@@ -653,6 +691,7 @@ private fun QuestionEditorCard(
                     voiceSessionActive = false
                     voiceListening = false
                     voiceReconnectAttempts = 0
+                    voiceLiveSegment = ""
                     voiceError = mapVoiceRecognitionError(
                         errorCode = error,
                         unavailableLabel = voiceUnavailable,
@@ -673,6 +712,10 @@ private fun QuestionEditorCard(
                         voiceSegments.addAll(updatedSegments)
                     }
                     voiceError = applyCombinedVoiceTranscript(isPartial = false)
+                    if (useSegmentedSession) {
+                        voiceListening = false
+                        return
+                    }
                     if (voiceSessionActive && !voiceStopRequested) {
                         voiceListening = false
                         destroyVoiceRecognizer()
@@ -690,6 +733,32 @@ private fun QuestionEditorCard(
                     voiceError = applyCombinedVoiceTranscript(isPartial = true)
                 }
 
+                override fun onSegmentResults(segmentResults: Bundle) {
+                    val transcript = extractVoiceTranscript(segmentResults)
+                    voiceReconnectAttempts = 0
+                    voiceLiveSegment = ""
+                    if (transcript.isNotBlank()) {
+                        val updatedSegments = mergeVoiceSegments(voiceSegments, transcript)
+                        voiceSegments.clear()
+                        voiceSegments.addAll(updatedSegments)
+                    }
+                    voiceError = applyCombinedVoiceTranscript(isPartial = false)
+                    voiceListening = true
+                }
+
+                override fun onEndOfSegmentedSession() {
+                    if (voiceSessionActive && !voiceStopRequested) {
+                        voiceListening = false
+                        destroyVoiceRecognizer()
+                        scheduleVoiceRestart(VoiceReconnectDelayMillis)
+                    } else {
+                        voiceSessionActive = false
+                        voiceListening = false
+                        voiceReconnectAttempts = 0
+                        destroyVoiceRecognizer()
+                    }
+                }
+
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
             },
         )
@@ -698,13 +767,18 @@ private fun QuestionEditorCard(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguageTag)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, voiceLanguageTag)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, question.prompt)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, useOnDeviceRecognizer)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 30_000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_400L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_600L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 45_000L)
+            if (useSegmentedSession) {
+                putExtra(
+                    RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                )
+            }
         }
 
         runCatching { recognizer.startListening(intent) }
@@ -930,17 +1004,54 @@ private fun QuestionEditorCard(
             )
         }
 
-        SectionActionRow {
-            if (question.voiceAllowed) {
-                TextButton(
-                    onClick = ::startVoiceFill,
-                    modifier = Modifier.padding(end = 8.dp),
-                ) {
-                    Text(if (voiceSessionActive) voiceStopLabel else voiceFillLabel)
+        SectionActionRow(modifier = Modifier.animateContentSize()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val saveButton: @Composable () -> Unit = {
+                    Button(
+                        onClick = ::saveCurrentAnswer,
+                        enabled = canSave,
+                        colors = headacheInsightActionButtonColors(),
+                        modifier = actionButtonModifier,
+                    ) {
+                        Text(stringResource(R.string.questionnaire_save))
+                    }
                 }
-            }
-            TextButton(onClick = { saveCurrentAnswer() }, enabled = canSave) {
-                Text(stringResource(R.string.questionnaire_save))
+                val voiceButton: @Composable () -> Unit = {
+                    if (voiceSessionActive) {
+                        Button(
+                            onClick = ::startVoiceFill,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = activeVoiceContainerColor,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                            modifier = actionButtonModifier,
+                        ) {
+                            Text(voiceStopLabel)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = ::startVoiceFill,
+                            modifier = actionButtonModifier,
+                        ) {
+                            Text(voiceFillLabel)
+                        }
+                    }
+                }
+
+                if (question.voiceAllowed) {
+                    if (handPreference == HandPreference.LEFT) {
+                        voiceButton()
+                        saveButton()
+                    } else {
+                        saveButton()
+                        voiceButton()
+                    }
+                } else {
+                    saveButton()
+                }
             }
         }
     }
@@ -1171,7 +1282,7 @@ private fun mapVoiceRecognitionError(
     else -> String.format(errorCodeLabel, errorCode)
 }
 
-private const val VoiceRestartDelayMillis = 250L
+private const val VoiceRestartDelayMillis = 450L
 private const val VoiceReconnectDelayMillis = 700L
 private const val MaxVoiceReconnectAttempts = 3
 

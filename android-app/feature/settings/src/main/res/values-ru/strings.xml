@@ -33,6 +33,10 @@
     <string name="settings_language_russian">Русский</string>
     <string name="settings_language_english">Английский</string>
     <string name="settings_language_selected">Выбрано: %1$s</string>
+    <string name="settings_hand_preference_title">Ведущая рука</string>
+    <string name="settings_hand_preference_subtitle">Размещать основные кнопки ближе к большому пальцу той руки, которой вам удобнее пользоваться.</string>
+    <string name="settings_hand_preference_right">Правша</string>
+    <string name="settings_hand_preference_left">Левша</string>
     <string name="settings_save">Сохранить настройки</string>
     <string name="settings_save_and_test">Сохранить и проверить связь</string>
     <string name="settings_connection_idle">Связь ещё не проверялась</string>

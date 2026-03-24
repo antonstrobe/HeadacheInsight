@@ -72,6 +72,9 @@ enum class UrgentActionLevel { NONE, MONITOR, DISCUSS_SOON, URGENT, EMERGENCY }
 enum class HypothesisConfidence { LOW, MEDIUM, HIGH }
 
 @Serializable
+enum class HandPreference { RIGHT, LEFT }
+
+@Serializable
 data class UserProfile(
     val id: String,
     val displayName: String? = null,
@@ -280,6 +283,7 @@ data class AppSettings(
     val locationConsent: Boolean = false,
     val comfortModeEnabled: Boolean = true,
     val onboardingCompleted: Boolean = false,
+    val handPreference: HandPreference = HandPreference.RIGHT,
     val lastSeedVersion: String? = null,
 )
 

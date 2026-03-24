@@ -33,6 +33,10 @@
     <string name="settings_language_russian">Russian</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_selected">Selected: %1$s</string>
+    <string name="settings_hand_preference_title">Handedness</string>
+    <string name="settings_hand_preference_subtitle">Place the main action buttons near the thumb of the hand you use more often.</string>
+    <string name="settings_hand_preference_right">Right-handed</string>
+    <string name="settings_hand_preference_left">Left-handed</string>
     <string name="settings_save">Save settings</string>
     <string name="settings_save_and_test">Save and test connection</string>
     <string name="settings_connection_idle">Connection not checked</string>

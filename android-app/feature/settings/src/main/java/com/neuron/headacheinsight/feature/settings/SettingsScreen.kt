@@ -32,6 +32,7 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
+import com.neuron.headacheinsight.core.model.HandPreference
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.BackendStatusRepository
@@ -91,6 +92,7 @@ class SettingsViewModel @Inject constructor(
 
     fun save(
         languageTag: String,
+        handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
         questionModel: String,
@@ -99,6 +101,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             persistSettings(
                 languageTag = languageTag,
+                handPreference = handPreference,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
                 questionModel = questionModel,
@@ -109,6 +112,7 @@ class SettingsViewModel @Inject constructor(
 
     fun saveAndTest(
         languageTag: String,
+        handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
         questionModel: String,
@@ -117,6 +121,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             persistSettings(
                 languageTag = languageTag,
+                handPreference = handPreference,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
                 questionModel = questionModel,
@@ -146,6 +151,7 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun persistSettings(
         languageTag: String,
+        handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
         questionModel: String,
@@ -165,6 +171,7 @@ class SettingsViewModel @Inject constructor(
                 cloudAnalysisEnabled = true,
                 languageTag = languageTag,
                 languageSelectionCompleted = true,
+                handPreference = handPreference,
                 lastSeedVersion = if (it.languageTag == languageTag) it.lastSeedVersion else null,
             )
         }
@@ -190,8 +197,8 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onSave: (String, String, String, String, String) -> Unit,
-    onSaveAndTest: (String, String, String, String, String) -> Unit,
+    onSave: (String, HandPreference, String, String, String, String) -> Unit,
+    onSaveAndTest: (String, HandPreference, String, String, String, String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
@@ -199,6 +206,7 @@ fun SettingsScreen(
     val cloudCredentials = state.cloudCredentials
 
     var languageState by remember(settings.languageTag) { mutableStateOf(settings.languageTag) }
+    var handPreferenceState by remember(settings.handPreference) { mutableStateOf(settings.handPreference) }
     var apiKeyState by remember(cloudCredentials.apiKey) { mutableStateOf(cloudCredentials.apiKey) }
     var analysisModelState by remember(cloudCredentials.analysisModel) { mutableStateOf(cloudCredentials.analysisModel) }
     var questionModelState by remember(cloudCredentials.questionModel) { mutableStateOf(cloudCredentials.questionModel) }
@@ -208,6 +216,7 @@ fun SettingsScreen(
     fun submitSave() {
         onSave(
             languageState,
+            handPreferenceState,
             apiKeyState,
             analysisModelState,
             questionModelState,
@@ -218,6 +227,7 @@ fun SettingsScreen(
     fun submitSaveAndTest() {
         onSaveAndTest(
             languageState,
+            handPreferenceState,
             apiKeyState,
             analysisModelState,
             questionModelState,
@@ -294,15 +304,31 @@ fun SettingsScreen(
             title = stringResource(R.string.settings_language_title),
             supportingText = stringResource(R.string.settings_language_subtitle),
         ) {
-            LanguageOptionButton(
+            SelectionOptionButton(
                 label = stringResource(R.string.settings_language_russian),
                 selected = languageState.startsWith("ru", ignoreCase = true),
                 onClick = { languageState = "ru-RU" },
             )
-            LanguageOptionButton(
+            SelectionOptionButton(
                 label = stringResource(R.string.settings_language_english),
                 selected = languageState.startsWith("en", ignoreCase = true),
                 onClick = { languageState = "en-US" },
+            )
+        }
+
+        HeadacheInsightSectionCard(
+            title = stringResource(R.string.settings_hand_preference_title),
+            supportingText = stringResource(R.string.settings_hand_preference_subtitle),
+        ) {
+            SelectionOptionButton(
+                label = stringResource(R.string.settings_hand_preference_right),
+                selected = handPreferenceState == HandPreference.RIGHT,
+                onClick = { handPreferenceState = HandPreference.RIGHT },
+            )
+            SelectionOptionButton(
+                label = stringResource(R.string.settings_hand_preference_left),
+                selected = handPreferenceState == HandPreference.LEFT,
+                onClick = { handPreferenceState = HandPreference.LEFT },
             )
         }
 
@@ -374,7 +400,7 @@ private fun ConnectionStatusBlock(
 }
 
 @Composable
-private fun LanguageOptionButton(
+private fun SelectionOptionButton(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,

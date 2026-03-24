@@ -20,6 +20,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -27,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightCardDefaults
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.Episode
+import com.neuron.headacheinsight.core.model.HandPreference
+
+val LocalHandPreference = staticCompositionLocalOf { HandPreference.RIGHT }
 
 @Composable
 fun SeveritySlider(
@@ -119,9 +123,14 @@ fun SectionActionRow(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val handPreference = LocalHandPreference.current
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = if (handPreference == HandPreference.RIGHT) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        },
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -176,23 +185,39 @@ fun BottomMenuActions(
     onHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val handPreference = LocalHandPreference.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(stringResource(R.string.navigation_back))
-        }
-        Button(
-            onClick = onHome,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(stringResource(R.string.navigation_home))
+        if (handPreference == HandPreference.LEFT) {
+            Button(
+                onClick = onHome,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.navigation_home))
+            }
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.navigation_back))
+            }
+        } else {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.navigation_back))
+            }
+            Button(
+                onClick = onHome,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.navigation_home))
+            }
         }
     }
 }
