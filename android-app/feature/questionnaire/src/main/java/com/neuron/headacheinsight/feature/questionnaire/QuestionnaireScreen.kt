@@ -3,6 +3,8 @@ package com.neuron.headacheinsight.feature.questionnaire
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.speech.RecognitionListener
@@ -373,10 +375,12 @@ private fun QuestionEditorCard(
     var voiceError by remember(question.id) { mutableStateOf<String?>(null) }
     var voiceSessionActive by remember(question.id) { mutableStateOf(false) }
     var voiceListening by remember(question.id) { mutableStateOf(false) }
+    var voiceReconnectAttempts by remember(question.id) { mutableStateOf(0) }
     var voiceStopRequested by remember(question.id) { mutableStateOf(false) }
     var voiceRecognizer by remember(question.id) { mutableStateOf<SpeechRecognizer?>(null) }
     var voiceLiveSegment by remember(question.id) { mutableStateOf("") }
     val voiceSegments = remember(question.id) { mutableStateListOf<String>() }
+    val voiceHandler = remember(question.id) { Handler(Looper.getMainLooper()) }
 
     val voiceFillLabel = stringResource(R.string.questionnaire_voice_fill)
     val voiceStopLabel = stringResource(R.string.questionnaire_voice_stop)
@@ -385,6 +389,7 @@ private fun QuestionEditorCard(
     val voicePermissionRequired = stringResource(R.string.questionnaire_voice_permission_required)
     val voiceUnavailable = stringResource(R.string.questionnaire_voice_unavailable)
     val voiceEmptyResult = stringResource(R.string.questionnaire_voice_empty_result)
+    val voiceDisconnected = stringResource(R.string.questionnaire_voice_service_disconnected)
     val voiceBooleanError = stringResource(R.string.questionnaire_voice_boolean_error)
     val voiceOptionError = stringResource(R.string.questionnaire_voice_option_error)
     val voiceNumberError = stringResource(R.string.questionnaire_voice_number_error)
@@ -409,6 +414,7 @@ private fun QuestionEditorCard(
     val showVoiceTranscriptField = question.voiceAllowed && (!hasPrimaryTextInput || voiceTranscriptText.isNotBlank() || voiceSessionActive)
 
     fun destroyVoiceRecognizer() {
+        voiceHandler.removeCallbacksAndMessages(null)
         voiceRecognizer?.cancel()
         voiceRecognizer?.destroy()
         voiceRecognizer = null
@@ -416,6 +422,7 @@ private fun QuestionEditorCard(
 
     DisposableEffect(question.id) {
         onDispose {
+            voiceHandler.removeCallbacksAndMessages(null)
             voiceRecognizer?.cancel()
             voiceRecognizer?.destroy()
         }
@@ -548,17 +555,33 @@ private fun QuestionEditorCard(
         voiceStopRequested = true
         voiceSessionActive = false
         voiceListening = false
+        voiceReconnectAttempts = 0
         voiceLiveSegment = ""
         destroyVoiceRecognizer()
     }
 
-    fun launchVoiceRecognition() {
+    lateinit var launchVoiceRecognition: () -> Unit
+
+    val scheduleVoiceRestart: (Long) -> Unit = { delayMillis ->
+        voiceHandler.removeCallbacksAndMessages(null)
+        voiceHandler.postDelayed(
+            {
+                if (!voiceSessionActive || voiceStopRequested) return@postDelayed
+                launchVoiceRecognition()
+            },
+            delayMillis,
+        )
+    }
+
+    launchVoiceRecognition = launch@{
         val useOnDeviceRecognizer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
         val recognitionAvailable = useOnDeviceRecognizer || SpeechRecognizer.isRecognitionAvailable(context)
         if (!recognitionAvailable) {
+            voiceSessionActive = false
+            voiceListening = false
             voiceError = voiceUnavailable
-            return
+            return@launch
         }
 
         destroyVoiceRecognizer()
@@ -569,8 +592,10 @@ private fun QuestionEditorCard(
                 SpeechRecognizer.createSpeechRecognizer(context)
             }
         }.getOrElse {
+            voiceSessionActive = false
+            voiceListening = false
             voiceError = voiceUnavailable
-            return
+            return@launch
         }
 
         voiceRecognizer = recognizer
@@ -581,7 +606,9 @@ private fun QuestionEditorCard(
 
         recognizer.setRecognitionListener(
             object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) = Unit
+                override fun onReadyForSpeech(params: Bundle?) {
+                    voiceReconnectAttempts = 0
+                }
 
                 override fun onBeginningOfSpeech() = Unit
 
@@ -598,21 +625,39 @@ private fun QuestionEditorCard(
                         voiceStopRequested = false
                         voiceSessionActive = false
                         voiceListening = false
+                        voiceReconnectAttempts = 0
                         destroyVoiceRecognizer()
                         return
                     }
-                    if (voiceSessionActive && shouldRestartVoiceRecognition(error)) {
+                    val canRestart =
+                        voiceSessionActive &&
+                            shouldRestartVoiceRecognition(error) &&
+                            (error != SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
+                                voiceReconnectAttempts < MaxVoiceReconnectAttempts)
+                    if (canRestart) {
                         voiceListening = false
                         voiceError = null
-                        launchVoiceRecognition()
+                        if (error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
+                            voiceReconnectAttempts += 1
+                        }
+                        destroyVoiceRecognizer()
+                        scheduleVoiceRestart(
+                            if (error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
+                                VoiceReconnectDelayMillis
+                            } else {
+                                VoiceRestartDelayMillis
+                            },
+                        )
                         return
                     }
                     voiceSessionActive = false
                     voiceListening = false
+                    voiceReconnectAttempts = 0
                     voiceError = mapVoiceRecognitionError(
                         errorCode = error,
                         unavailableLabel = voiceUnavailable,
                         emptyResultLabel = voiceEmptyResult,
+                        disconnectedLabel = voiceDisconnected,
                         errorCodeLabel = voiceErrorCode,
                     )
                     destroyVoiceRecognizer()
@@ -620,6 +665,7 @@ private fun QuestionEditorCard(
 
                 override fun onResults(results: Bundle?) {
                     val transcript = extractVoiceTranscript(results)
+                    voiceReconnectAttempts = 0
                     voiceLiveSegment = ""
                     if (transcript.isNotBlank()) {
                         val updatedSegments = mergeVoiceSegments(voiceSegments, transcript)
@@ -629,10 +675,12 @@ private fun QuestionEditorCard(
                     voiceError = applyCombinedVoiceTranscript(isPartial = false)
                     if (voiceSessionActive && !voiceStopRequested) {
                         voiceListening = false
-                        launchVoiceRecognition()
+                        destroyVoiceRecognizer()
+                        scheduleVoiceRestart(VoiceRestartDelayMillis)
                     } else {
                         voiceSessionActive = false
                         voiceListening = false
+                        voiceReconnectAttempts = 0
                         destroyVoiceRecognizer()
                     }
                 }
@@ -689,6 +737,7 @@ private fun QuestionEditorCard(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
             voiceError = null
+            voiceReconnectAttempts = 0
             voiceStopRequested = false
             launchVoiceRecognition()
         } else {
@@ -1096,7 +1145,8 @@ private fun mergeVoiceSegments(
 
 private fun shouldRestartVoiceRecognition(errorCode: Int): Boolean = when (errorCode) {
     SpeechRecognizer.ERROR_NO_MATCH,
-    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> true
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+    SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> true
     else -> false
 }
 
@@ -1110,14 +1160,20 @@ private fun mapVoiceRecognitionError(
     errorCode: Int,
     unavailableLabel: String,
     emptyResultLabel: String,
+    disconnectedLabel: String,
     errorCodeLabel: String,
 ): String = when (errorCode) {
     SpeechRecognizer.ERROR_NO_MATCH,
     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> emptyResultLabel
+    SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> disconnectedLabel
     SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
     SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> unavailableLabel
     else -> String.format(errorCodeLabel, errorCode)
 }
+
+private const val VoiceRestartDelayMillis = 250L
+private const val VoiceReconnectDelayMillis = 700L
+private const val MaxVoiceReconnectAttempts = 3
 
 private fun localizedQuestionOptionLabel(
     option: String,
