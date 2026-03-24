@@ -344,20 +344,18 @@ class DefaultSafetyRepository @Inject constructor(
 @Singleton
 class DefaultInsightRepository @Inject constructor(
     private val episodeRepository: EpisodeRepository,
-    private val settingsRepository: SettingsRepository,
     private val syncRepository: SyncRepository,
 ) : InsightRepository {
     override fun observeHomeDashboard(): Flow<HomeDashboard> = combine(
         episodeRepository.observeActiveEpisode(),
         episodeRepository.observeEpisodes(),
-        settingsRepository.observeSettings(),
         syncRepository.observeQueue(),
-    ) { active, episodes, settings, queue ->
+    ) { active, episodes, queue ->
         HomeDashboard(
             pendingEpisode = active,
             lastEpisode = episodes.firstOrNull(),
             monthlyHeadacheDays = episodes.take(30).count(),
-            cloudEnabled = settings.cloudAnalysisEnabled,
+            cloudEnabled = true,
             queueCount = queue.count { it.status != SyncStatus.COMPLETE },
         )
     }

@@ -22,7 +22,6 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.model.UserProfile
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
-import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.ProfileRepository
 import com.neuron.headacheinsight.domain.UpsertProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -40,13 +39,13 @@ class ProfileViewModel @Inject constructor(
     val profile: StateFlow<UserProfile?> = profileRepository.observeProfile()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun save(profile: UserProfile?, displayName: String, cityRegion: String, cloud: Boolean) {
+    fun save(profile: UserProfile?, displayName: String, cityRegion: String) {
         viewModelScope.launch {
             upsertProfileUseCase(
                 existing = profile,
                 displayName = displayName.ifBlank { null },
                 cityRegion = cityRegion.ifBlank { null },
-                cloudEnabled = cloud,
+                cloudEnabled = true,
                 locationConsent = profile?.locationConsent ?: false,
                 attachmentConsent = profile?.attachmentUploadConsent ?: false,
             )
@@ -63,7 +62,7 @@ fun ProfileRoute(
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     ProfileScreen(
         profile = profile,
-        onSave = { displayName, cityRegion, cloud -> viewModel.save(profile, displayName, cityRegion, cloud) },
+        onSave = { displayName, cityRegion -> viewModel.save(profile, displayName, cityRegion) },
         onBack = onBack,
         onHome = onHome,
     )
@@ -72,13 +71,12 @@ fun ProfileRoute(
 @Composable
 fun ProfileScreen(
     profile: UserProfile?,
-    onSave: (String, String, Boolean) -> Unit,
+    onSave: (String, String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
     var displayName by remember(profile?.displayName) { mutableStateOf(profile?.displayName.orEmpty()) }
     var cityRegion by remember(profile?.cityRegion) { mutableStateOf(profile?.cityRegion.orEmpty()) }
-    var cloud by remember(profile?.cloudAnalysisEnabled) { mutableStateOf(profile?.cloudAnalysisEnabled ?: false) }
 
     Column(
         modifier = Modifier
@@ -100,13 +98,8 @@ fun ProfileScreen(
                 label = { Text(stringResource(R.string.profile_city_region)) },
             )
         }
-        ToggleSectionCard(
-            title = stringResource(R.string.profile_cloud_title),
-            checked = cloud,
-            onCheckedChange = { cloud = it },
-        )
         Button(
-            onClick = { onSave(displayName, cityRegion, cloud) },
+            onClick = { onSave(displayName, cityRegion) },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.profile_save))

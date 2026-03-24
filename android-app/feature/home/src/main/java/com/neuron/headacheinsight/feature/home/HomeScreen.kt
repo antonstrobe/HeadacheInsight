@@ -103,7 +103,7 @@ fun HomeScreen(
             HomeActionItem(
                 label = stringResource(R.string.home_new_questions),
                 onClick = { state.pendingEpisode?.id?.let(onQuestions) },
-                enabled = state.cloudEnabled && state.pendingEpisode != null,
+                enabled = state.pendingEpisode != null,
             ),
         )
         add(HomeActionItem(label = stringResource(R.string.home_settings), onClick = onSettings))
@@ -167,16 +167,8 @@ fun HomeScreen(
                 supportingText = stringResource(R.string.home_status_subtitle),
             ) {
                 HeadacheInsightStatusBadge(
-                    label = if (state.cloudEnabled) {
-                        stringResource(R.string.home_cloud_enabled)
-                    } else {
-                        stringResource(R.string.home_local_only)
-                    },
-                    color = if (state.cloudEnabled) {
-                        HeadacheInsightStatusColors.CloudAnalyzed
-                    } else {
-                        HeadacheInsightStatusColors.LocalComplete
-                    },
+                    label = stringResource(R.string.home_cloud_enabled),
+                    color = HeadacheInsightStatusColors.CloudAnalyzed,
                 )
                 HeadacheInsightStatusBadge(
                     label = stringResource(R.string.home_queue_count, state.queueCount),

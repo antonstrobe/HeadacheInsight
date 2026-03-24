@@ -241,7 +241,7 @@ class UpsertProfileUseCase @Inject constructor(
             wakeSchedule = existing?.wakeSchedule,
             workSchedule = existing?.workSchedule,
             baselineNotes = existing?.baselineNotes,
-            cloudAnalysisEnabled = cloudEnabled,
+            cloudAnalysisEnabled = true,
             locationConsent = locationConsent,
             attachmentUploadConsent = attachmentConsent,
             createdAt = existing?.createdAt ?: now,
@@ -250,7 +250,7 @@ class UpsertProfileUseCase @Inject constructor(
         profileRepository.upsertProfile(profile)
         settingsRepository.updateSettings {
             it.copy(
-                cloudAnalysisEnabled = cloudEnabled,
+                cloudAnalysisEnabled = true,
                 attachmentUploadConsent = attachmentConsent,
                 locationConsent = locationConsent,
                 onboardingCompleted = true,

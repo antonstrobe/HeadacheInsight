@@ -32,13 +32,10 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
-import com.neuron.headacheinsight.core.model.LocalSpeechPackState
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
-import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.BackendStatusRepository
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
-import com.neuron.headacheinsight.domain.LocalSpeechPackManager
 import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -65,7 +62,6 @@ private data class ConnectionUiState(
 data class SettingsUiState(
     val appSettings: AppSettings = AppSettings(),
     val cloudCredentials: CloudCredentials = CloudCredentials(),
-    val localSpeechPack: LocalSpeechPackState = LocalSpeechPackState(),
     val connectionState: ConnectionCheckState = ConnectionCheckState.IDLE,
     val connectionStatus: BackendConnectionStatus? = null,
     val connectionErrorMessage: String? = null,
@@ -75,7 +71,6 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
-    private val localSpeechPackManager: LocalSpeechPackManager,
     private val backendStatusRepository: BackendStatusRepository,
 ) : androidx.lifecycle.ViewModel() {
     private val connectionState = MutableStateFlow(ConnectionUiState())
@@ -83,13 +78,11 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<SettingsUiState> = combine(
         settingsRepository.observeSettings(),
         cloudCredentialsRepository.observeCredentials(),
-        localSpeechPackManager.observeState(),
         connectionState,
-    ) { settings, cloudCredentials, localSpeechPack, connection ->
+    ) { settings, cloudCredentials, connection ->
         SettingsUiState(
             appSettings = settings,
             cloudCredentials = cloudCredentials,
-            localSpeechPack = localSpeechPack,
             connectionState = connection.state,
             connectionStatus = connection.status,
             connectionErrorMessage = connection.errorMessage,
@@ -97,7 +90,6 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun save(
-        cloudEnabled: Boolean,
         languageTag: String,
         apiKey: String,
         analysisModel: String,
@@ -106,7 +98,6 @@ class SettingsViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             persistSettings(
-                cloudEnabled = cloudEnabled,
                 languageTag = languageTag,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
@@ -117,7 +108,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveAndTest(
-        cloudEnabled: Boolean,
         languageTag: String,
         apiKey: String,
         analysisModel: String,
@@ -126,7 +116,6 @@ class SettingsViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             persistSettings(
-                cloudEnabled = cloudEnabled,
                 languageTag = languageTag,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
@@ -155,20 +144,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun refreshLocalSpeech(languageTag: String) {
-        viewModelScope.launch {
-            localSpeechPackManager.refresh(languageTag)
-        }
-    }
-
-    fun installLocalSpeech(languageTag: String) {
-        viewModelScope.launch {
-            localSpeechPackManager.install(languageTag)
-        }
-    }
-
     private suspend fun persistSettings(
-        cloudEnabled: Boolean,
         languageTag: String,
         apiKey: String,
         analysisModel: String,
@@ -186,7 +162,7 @@ class SettingsViewModel @Inject constructor(
         )
         settingsRepository.updateSettings {
             it.copy(
-                cloudAnalysisEnabled = cloudEnabled,
+                cloudAnalysisEnabled = true,
                 languageTag = languageTag,
                 languageSelectionCompleted = true,
                 lastSeedVersion = if (it.languageTag == languageTag) it.lastSeedVersion else null,
@@ -202,15 +178,10 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(state.appSettings.languageTag) {
-        viewModel.refreshLocalSpeech(state.appSettings.languageTag)
-    }
     SettingsScreen(
         state = state,
         onSave = viewModel::save,
         onSaveAndTest = viewModel::saveAndTest,
-        onRefreshLocalSpeech = viewModel::refreshLocalSpeech,
-        onInstallLocalSpeech = viewModel::installLocalSpeech,
         onBack = onBack,
         onHome = onHome,
     )
@@ -219,17 +190,14 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onSave: (Boolean, String, String, String, String, String) -> Unit,
-    onSaveAndTest: (Boolean, String, String, String, String, String) -> Unit,
-    onRefreshLocalSpeech: (String) -> Unit,
-    onInstallLocalSpeech: (String) -> Unit,
+    onSave: (String, String, String, String, String) -> Unit,
+    onSaveAndTest: (String, String, String, String, String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
     val settings = state.appSettings
     val cloudCredentials = state.cloudCredentials
 
-    var cloudState by remember(settings.cloudAnalysisEnabled) { mutableStateOf(settings.cloudAnalysisEnabled) }
     var languageState by remember(settings.languageTag) { mutableStateOf(settings.languageTag) }
     var apiKeyState by remember(cloudCredentials.apiKey) { mutableStateOf(cloudCredentials.apiKey) }
     var analysisModelState by remember(cloudCredentials.analysisModel) { mutableStateOf(cloudCredentials.analysisModel) }
@@ -239,7 +207,6 @@ fun SettingsScreen(
 
     fun submitSave() {
         onSave(
-            cloudState,
             languageState,
             apiKeyState,
             analysisModelState,
@@ -250,7 +217,6 @@ fun SettingsScreen(
 
     fun submitSaveAndTest() {
         onSaveAndTest(
-            cloudState,
             languageState,
             apiKeyState,
             analysisModelState,
@@ -266,13 +232,6 @@ fun SettingsScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ToggleSectionCard(
-            title = stringResource(R.string.settings_cloud_title),
-            checked = cloudState,
-            onCheckedChange = { cloudState = it },
-            supportingText = stringResource(R.string.settings_cloud_subtitle),
-        )
-
         HeadacheInsightSectionCard(
             title = stringResource(R.string.settings_openai_title),
             supportingText = stringResource(R.string.settings_openai_subtitle),
@@ -329,30 +288,6 @@ fun SettingsScreen(
                 label = { Text(stringResource(R.string.settings_transcribe_model_label)) },
                 singleLine = true,
             )
-        }
-
-        HeadacheInsightSectionCard(
-            title = stringResource(R.string.settings_local_speech_title),
-            supportingText = stringResource(R.string.settings_local_speech_subtitle),
-        ) {
-            Text(localSpeechStatusLabel(state.localSpeechPack))
-            state.localSpeechPack.progressPercent?.let { progress ->
-                Text(stringResource(R.string.settings_local_speech_progress, progress))
-            }
-            OutlinedButton(
-                onClick = { onRefreshLocalSpeech(languageState) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.localSpeechPack.isBusy,
-            ) {
-                Text(stringResource(R.string.settings_local_speech_refresh))
-            }
-            Button(
-                onClick = { onInstallLocalSpeech(languageState) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.localSpeechPack.isBusy && !state.localSpeechPack.isInstalled,
-            ) {
-                Text(stringResource(R.string.settings_local_speech_install))
-            }
         }
 
         HeadacheInsightSectionCard(
@@ -436,18 +371,6 @@ private fun ConnectionStatusBlock(
     state.connectionErrorMessage?.let { message ->
         Text(stringResource(R.string.settings_connection_error_message, message))
     }
-}
-
-@Composable
-private fun localSpeechStatusLabel(state: LocalSpeechPackState): String = when (state.status) {
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.UNKNOWN -> stringResource(R.string.settings_local_speech_status_unknown)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.CHECKING -> stringResource(R.string.settings_local_speech_status_checking)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.READY -> stringResource(R.string.settings_local_speech_status_ready)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.NOT_INSTALLED -> stringResource(R.string.settings_local_speech_status_not_installed)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.INSTALLING -> stringResource(R.string.settings_local_speech_status_installing)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.SCHEDULED -> stringResource(R.string.settings_local_speech_status_scheduled)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.UNSUPPORTED -> stringResource(R.string.settings_local_speech_status_unsupported)
-    com.neuron.headacheinsight.core.model.LocalSpeechPackStatus.ERROR -> stringResource(R.string.settings_local_speech_status_error)
 }
 
 @Composable

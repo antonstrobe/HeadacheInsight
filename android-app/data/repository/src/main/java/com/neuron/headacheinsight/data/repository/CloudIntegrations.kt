@@ -38,7 +38,6 @@ import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.EpisodeRepository
 import com.neuron.headacheinsight.domain.LocalSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.QuestionRepository
-import com.neuron.headacheinsight.domain.SettingsRepository
 import com.neuron.headacheinsight.domain.VoiceIntakeRepository
 import dagger.Binds
 import dagger.Module
@@ -67,7 +66,6 @@ class DefaultAnalysisRepository @Inject constructor(
     private val episodeRepository: EpisodeRepository,
     private val questionRepository: QuestionRepository,
     private val attachmentRepository: AttachmentRepository,
-    private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val timeProvider: TimeProvider,
     private val json: Json,
@@ -79,39 +77,31 @@ class DefaultAnalysisRepository @Inject constructor(
     override suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse> = runCatching {
         val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
         val now = timeProvider.now()
-        val credentials = cloudCredentialsOrNull()
-        val (response, usedCloudResponse) = if (credentials == null) {
-            buildFallbackAnalysis(ownerId, episodeDetail, now.toString()) to false
-        } else {
-            runCatching {
-                backendApi.completeJson<OpenAiAnalysisDraft>(
-                    model = credentials.analysisModel,
-                    systemPrompt = buildEpisodeAnalysisSystemPrompt(episodeDetail.episode.locale),
-                    userPayload = json.encodeToString(
-                        AnalyzeEpisodeRequest.serializer(),
-                        AnalyzeEpisodeRequest(
-                            ownerId = ownerId,
-                            locale = episodeDetail.episode.locale,
-                            episode = episodeDetail,
-                        ),
-                    ),
-                    json = json,
-                    temperature = 0.2,
-                ).toAnalysisResponse(
+        val credentials = requireCloudCredentials()
+        val response = backendApi.completeJson<OpenAiAnalysisDraft>(
+            model = credentials.analysisModel,
+            systemPrompt = buildEpisodeAnalysisSystemPrompt(episodeDetail.episode.locale),
+            userPayload = json.encodeToString(
+                AnalyzeEpisodeRequest.serializer(),
+                AnalyzeEpisodeRequest(
                     ownerId = ownerId,
-                    generatedAt = now.toString(),
-                    createdAt = now,
                     locale = episodeDetail.episode.locale,
-                )
-            }.map { it to true }.getOrElse {
-                buildFallbackAnalysis(ownerId, episodeDetail, now.toString()) to false
-            }
-        }
+                    episode = episodeDetail,
+                ),
+            ),
+            json = json,
+            temperature = 0.2,
+        ).toAnalysisResponse(
+            ownerId = ownerId,
+            generatedAt = now.toString(),
+            createdAt = now,
+            locale = episodeDetail.episode.locale,
+        )
         persistAnalysis(
             ownerId = ownerId,
             response = response,
-            modelName = if (usedCloudResponse) credentials?.analysisModel ?: "local-fallback" else "local-fallback",
-            source = if (usedCloudResponse) AnalysisSource.CLOUD else AnalysisSource.LOCAL_RULE,
+            modelName = credentials.analysisModel,
+            source = AnalysisSource.CLOUD,
         )
         if (response.nextQuestions.isNotEmpty()) {
             questionRepository.upsertGeneratedQuestions(response.nextQuestions)
@@ -121,30 +111,28 @@ class DefaultAnalysisRepository @Inject constructor(
 
     override suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>> = runCatching {
         val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
-        val credentials = cloudCredentialsOrNull() ?: return@runCatching emptyList()
+        val credentials = requireCloudCredentials()
         val createdAt = timeProvider.now()
-        val questions = runCatching {
-            backendApi.completeJson<OpenAiQuestionDraftResponse>(
-                model = credentials.questionModel,
-                systemPrompt = buildFollowUpQuestionSystemPrompt(episodeDetail.episode.locale),
-                userPayload = json.encodeToString(
-                    GenerateFollowUpQuestionsRequest.serializer(),
-                    GenerateFollowUpQuestionsRequest(
-                        ownerId = ownerId,
-                        locale = episodeDetail.episode.locale,
-                        episode = episodeDetail,
-                    ),
-                ),
-                json = json,
-                temperature = 0.3,
-            ).questions.mapIndexed { index, draft ->
-                draft.toQuestionTemplate(
+        val questions = backendApi.completeJson<OpenAiQuestionDraftResponse>(
+            model = credentials.questionModel,
+            systemPrompt = buildFollowUpQuestionSystemPrompt(episodeDetail.episode.locale),
+            userPayload = json.encodeToString(
+                GenerateFollowUpQuestionsRequest.serializer(),
+                GenerateFollowUpQuestionsRequest(
+                    ownerId = ownerId,
                     locale = episodeDetail.episode.locale,
-                    createdAt = createdAt,
-                    position = index,
-                )
-            }
-        }.getOrDefault(emptyList())
+                    episode = episodeDetail,
+                ),
+            ),
+            json = json,
+            temperature = 0.3,
+        ).questions.mapIndexed { index, draft ->
+            draft.toQuestionTemplate(
+                locale = episodeDetail.episode.locale,
+                createdAt = createdAt,
+                position = index,
+            )
+        }
         if (questions.isNotEmpty()) {
             questionRepository.upsertGeneratedQuestions(questions)
         }
@@ -153,45 +141,31 @@ class DefaultAnalysisRepository @Inject constructor(
 
     override suspend fun analyzeAttachments(ownerId: String): Result<List<String>> = runCatching {
         val attachments = attachmentRepository.observeAttachmentsForOwner(ownerId).first()
-        val locale = episodeRepository.observeEpisodeDetail(ownerId).first()?.episode?.locale ?: "en-US"
-        val credentials = cloudCredentialsOrNull()
-        if (credentials == null || attachments.isEmpty()) {
-            attachments.mapNotNull { attachment ->
-                attachment.extractedText
-                    ?.lineSequence()
-                    ?.map(String::trim)
-                    ?.firstOrNull { it.isNotBlank() }
-            }
+        if (attachments.isEmpty()) {
+            emptyList()
         } else {
-            runCatching {
-                backendApi.completeJson<OpenAiAttachmentSummary>(
-                    model = credentials.analysisModel,
-                    systemPrompt = buildAttachmentSummarySystemPrompt(locale),
-                    userPayload = json.encodeToString(
-                        AttachmentAnalysisPayload.serializer(),
-                        AttachmentAnalysisPayload(
-                            ownerId = ownerId,
-                            locale = locale,
-                            attachments = attachments.map {
-                                AttachmentDigest(
-                                    displayName = it.displayName,
-                                    mimeType = it.mimeType,
-                                    extractedText = it.extractedText,
-                                )
-                            },
-                        ),
+            val locale = episodeRepository.observeEpisodeDetail(ownerId).first()?.episode?.locale ?: "en-US"
+            val credentials = requireCloudCredentials()
+            backendApi.completeJson<OpenAiAttachmentSummary>(
+                model = credentials.analysisModel,
+                systemPrompt = buildAttachmentSummarySystemPrompt(locale),
+                userPayload = json.encodeToString(
+                    AttachmentAnalysisPayload.serializer(),
+                    AttachmentAnalysisPayload(
+                        ownerId = ownerId,
+                        locale = locale,
+                        attachments = attachments.map {
+                            AttachmentDigest(
+                                displayName = it.displayName,
+                                mimeType = it.mimeType,
+                                extractedText = it.extractedText,
+                            )
+                        },
                     ),
-                    json = json,
-                    temperature = 0.2,
-                ).summary
-            }.getOrDefault(
-                attachments.mapNotNull { attachment ->
-                    attachment.extractedText
-                        ?.lineSequence()
-                        ?.map(String::trim)
-                        ?.firstOrNull { it.isNotBlank() }
-                },
-            )
+                ),
+                json = json,
+                temperature = 0.2,
+            ).summary
         }
     }
 
@@ -217,11 +191,9 @@ class DefaultAnalysisRepository @Inject constructor(
         )
     }
 
-    private suspend fun cloudCredentialsOrNull() =
-        if (!settingsRepository.observeSettings().first().cloudAnalysisEnabled) {
-            null
-        } else {
-            cloudCredentialsRepository.observeCredentials().first().takeIf { it.apiKey.isNotBlank() }
+    private suspend fun requireCloudCredentials() =
+        cloudCredentialsRepository.observeCredentials().first().also { credentials ->
+            require(credentials.apiKey.isNotBlank()) { "OpenAI API key is empty" }
         }
 }
 
@@ -363,11 +335,9 @@ class LocalVoiceIntakeExtractor @Inject constructor() {
 @Singleton
 class DefaultVoiceIntakeRepository @Inject constructor(
     private val backendApi: BackendApi,
-    private val settingsRepository: SettingsRepository,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val episodeRepository: EpisodeRepository,
     private val timeProvider: TimeProvider,
-    private val localVoiceIntakeExtractor: LocalVoiceIntakeExtractor,
     private val json: Json,
 ) : VoiceIntakeRepository {
     override suspend fun structureVoiceIntake(
@@ -379,13 +349,6 @@ class DefaultVoiceIntakeRepository @Inject constructor(
         if (normalized.isBlank()) {
             return Result.failure(IllegalArgumentException("Transcript is empty"))
         }
-        val settings = settingsRepository.observeSettings().first()
-        if (!settings.cloudAnalysisEnabled) {
-            val localDraft = localVoiceIntakeExtractor.buildDraft(ownerId, locale, normalized)
-            persistDraft(localDraft, AnalysisSource.LOCAL_RULE)
-            return Result.success(localDraft)
-        }
-
         return runCatching {
             val credentials = cloudCredentialsRepository.observeCredentials().first()
             require(credentials.apiKey.isNotBlank()) { "OpenAI API key is empty" }
@@ -410,10 +373,6 @@ class DefaultVoiceIntakeRepository @Inject constructor(
             )
             persistDraft(draft, AnalysisSource.CLOUD)
             draft
-        }.recoverCatching {
-            val localDraft = localVoiceIntakeExtractor.buildDraft(ownerId, locale, normalized)
-            persistDraft(localDraft, AnalysisSource.LOCAL_RULE)
-            localDraft
         }
     }
 

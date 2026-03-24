@@ -34,7 +34,6 @@ import javax.inject.Inject
 data class OnboardingUiState(
     val displayName: String = "",
     val cityRegion: String = "",
-    val cloudEnabled: Boolean = false,
     val locationConsent: Boolean = false,
     val attachmentConsent: Boolean = false,
 )
@@ -53,7 +52,6 @@ class OnboardingViewModel @Inject constructor(
         current.copy(
             displayName = current.displayName.ifBlank { profile?.displayName.orEmpty() },
             cityRegion = current.cityRegion.ifBlank { profile?.cityRegion.orEmpty() },
-            cloudEnabled = current.cloudEnabled || (profile?.cloudAnalysisEnabled == true),
             locationConsent = current.locationConsent || (profile?.locationConsent == true),
             attachmentConsent = current.attachmentConsent || (profile?.attachmentUploadConsent == true),
         )
@@ -61,7 +59,6 @@ class OnboardingViewModel @Inject constructor(
 
     fun updateDisplayName(value: String) = draft.tryEmit(state.value.copy(displayName = value))
     fun updateCityRegion(value: String) = draft.tryEmit(state.value.copy(cityRegion = value))
-    fun updateCloud(enabled: Boolean) = draft.tryEmit(state.value.copy(cloudEnabled = enabled))
     fun updateLocationConsent(enabled: Boolean) = draft.tryEmit(state.value.copy(locationConsent = enabled))
     fun updateAttachmentConsent(enabled: Boolean) = draft.tryEmit(state.value.copy(attachmentConsent = enabled))
 
@@ -71,7 +68,7 @@ class OnboardingViewModel @Inject constructor(
                 existing = null,
                 displayName = state.value.displayName.ifBlank { null },
                 cityRegion = state.value.cityRegion.ifBlank { null },
-                cloudEnabled = state.value.cloudEnabled,
+                cloudEnabled = true,
                 locationConsent = state.value.locationConsent,
                 attachmentConsent = state.value.attachmentConsent,
             )
@@ -90,7 +87,6 @@ fun OnboardingRoute(
         state = state,
         onDisplayNameChanged = viewModel::updateDisplayName,
         onCityRegionChanged = viewModel::updateCityRegion,
-        onCloudChanged = viewModel::updateCloud,
         onLocationConsentChanged = viewModel::updateLocationConsent,
         onAttachmentConsentChanged = viewModel::updateAttachmentConsent,
         onComplete = { viewModel.save(onComplete) },
@@ -102,7 +98,6 @@ fun OnboardingScreen(
     state: OnboardingUiState,
     onDisplayNameChanged: (String) -> Unit,
     onCityRegionChanged: (String) -> Unit,
-    onCloudChanged: (Boolean) -> Unit,
     onLocationConsentChanged: (Boolean) -> Unit,
     onAttachmentConsentChanged: (Boolean) -> Unit,
     onComplete: () -> Unit,
@@ -136,12 +131,6 @@ fun OnboardingScreen(
             )
         }
 
-        ToggleSectionCard(
-            title = stringResource(R.string.onboarding_cloud_title),
-            checked = state.cloudEnabled,
-            onCheckedChange = onCloudChanged,
-            supportingText = stringResource(R.string.onboarding_cloud_subtitle),
-        )
         ToggleSectionCard(
             title = stringResource(R.string.onboarding_location_title),
             checked = state.locationConsent,

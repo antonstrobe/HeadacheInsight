@@ -26,7 +26,6 @@ import com.neuron.headacheinsight.core.model.TranscriptVariant
 import com.neuron.headacheinsight.domain.AudioRecorder
 import com.neuron.headacheinsight.domain.CloudSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.EpisodeRepository
-import com.neuron.headacheinsight.domain.LocalSpeechRecognizerEngine
 import com.neuron.headacheinsight.domain.SyncRepository
 import com.neuron.headacheinsight.domain.SyncScheduler
 import dagger.Binds
@@ -169,6 +168,7 @@ class WorkManagerSyncScheduler @Inject constructor(
         syncRepository.enqueue(item)
         val request = OneTimeWorkRequestBuilder<TranscriptionWorker>()
             .setInputData(Data.Builder().putString("queue_id", item.id).putString("audio_path", audioPath).putString("episode_id", episodeId).build())
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueue(request)
@@ -179,7 +179,6 @@ class WorkManagerSyncScheduler @Inject constructor(
 class TranscriptionWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val localSpeechRecognizerEngine: LocalSpeechRecognizerEngine,
     private val cloudSpeechRecognizerEngine: CloudSpeechRecognizerEngine,
     private val episodeRepository: EpisodeRepository,
     private val syncRepository: SyncRepository,
@@ -190,18 +189,6 @@ class TranscriptionWorker @AssistedInject constructor(
         val audioPath = inputData.getString("audio_path") ?: return Result.failure()
         val episodeId = inputData.getString("episode_id") ?: return Result.failure()
         syncRepository.markRunning(queueId)
-
-        val localResult: kotlin.Result<EpisodeTranscript> = if (localSpeechRecognizerEngine.isAvailable()) {
-            localSpeechRecognizerEngine.transcribeAudio(audioPath, null)
-        } else {
-            kotlin.Result.failure(IllegalStateException("Local ASR unavailable"))
-        }
-
-        if (localResult.isSuccess) {
-            episodeRepository.upsertTranscript(localResult.getOrThrow())
-            syncRepository.markComplete(queueId)
-            return Result.success()
-        }
 
         val cloudResult: kotlin.Result<EpisodeTranscript> = cloudSpeechRecognizerEngine.transcribeAudio(audioPath, null)
         return if (cloudResult.isSuccess) {
@@ -216,8 +203,8 @@ class TranscriptionWorker @AssistedInject constructor(
                     rawAudioPath = audioPath,
                     transcriptText = null,
                     language = null,
-                    engineType = "local",
-                    variant = TranscriptVariant.LOCAL,
+                    engineType = cloudSpeechRecognizerEngine.engineName,
+                    variant = TranscriptVariant.CLOUD,
                     confidence = null,
                     createdAt = timeProvider.now(),
                 ),

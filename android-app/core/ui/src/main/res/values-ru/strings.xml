@@ -23,11 +23,11 @@
     <string name="attachment_type_document">Документ</string>
     <string name="attachment_type_screenshot">Скриншот</string>
     <string name="extraction_not_started">Не начато</string>
-    <string name="extraction_local_extracted">Извлечено локально</string>
+    <string name="extraction_local_extracted">Извлечено на устройстве</string>
     <string name="extraction_cloud_queued">Поставлено в облачную очередь</string>
     <string name="extraction_cloud_complete">Облачное извлечение завершено</string>
     <string name="extraction_failed">Не удалось извлечь</string>
-    <string name="upload_local_only">Только локально</string>
+    <string name="upload_local_only">Сохранено на устройстве</string>
     <string name="upload_queued">В очереди</string>
     <string name="upload_uploading">Загрузка</string>
     <string name="upload_uploaded">Загружено</string>

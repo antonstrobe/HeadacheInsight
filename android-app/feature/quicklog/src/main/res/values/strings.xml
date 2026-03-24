@@ -13,11 +13,11 @@
     <string name="quicklog_notes_label">Short structured summary</string>
     <string name="quicklog_medication_title">Medication notes</string>
     <string name="quicklog_medication_label">What have you taken?</string>
-    <string name="quicklog_dictation_start">Start offline dictation</string>
-    <string name="quicklog_dictation_stop">Stop offline dictation</string>
+    <string name="quicklog_dictation_start">Start voice capture</string>
+    <string name="quicklog_dictation_stop">Stop voice capture</string>
     <string name="quicklog_dictation_prompt">Describe what you feel</string>
     <string name="quicklog_dictation_saved">Dictation saved: %1$s</string>
-    <string name="quicklog_dictation_unavailable">Offline dictation is unavailable on this device.</string>
+    <string name="quicklog_dictation_unavailable">Voice capture is unavailable right now.</string>
     <string name="quicklog_voice_start">Start voice fill</string>
     <string name="quicklog_voice_stop">Stop voice fill</string>
     <string name="quicklog_save_now">Save now</string>
@@ -29,7 +29,7 @@
     <string name="quicklog_live_subtitle">Recent speech appears here so you can see that recognition and server updates are working.</string>
     <string name="quicklog_live_empty">Start voice fill to see live speech here.</string>
     <string name="quicklog_live_now_title">Speaking now</string>
-    <string name="quicklog_live_now_subtitle">A short pause auto-fixes the phrase and keeps listening without manual restarts.</string>
+    <string name="quicklog_live_now_subtitle">The current phrase appears here while the app sends rolling audio snapshots to the API.</string>
     <string name="quicklog_detected_title">Detected from voice</string>
     <string name="quicklog_detected_subtitle">These fields are built from the structured JSON draft returned while you speak.</string>
     <string name="quicklog_follow_up_preparing">Preparing follow-up questions</string>

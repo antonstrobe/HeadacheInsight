@@ -23,11 +23,11 @@
     <string name="attachment_type_document">Document</string>
     <string name="attachment_type_screenshot">Screenshot</string>
     <string name="extraction_not_started">Not started</string>
-    <string name="extraction_local_extracted">Extracted locally</string>
+    <string name="extraction_local_extracted">Extracted on device</string>
     <string name="extraction_cloud_queued">Queued for cloud extraction</string>
     <string name="extraction_cloud_complete">Cloud extraction complete</string>
     <string name="extraction_failed">Extraction failed</string>
-    <string name="upload_local_only">Local only</string>
+    <string name="upload_local_only">Stored on device</string>
     <string name="upload_queued">Queued</string>
     <string name="upload_uploading">Uploading</string>
     <string name="upload_uploaded">Uploaded</string>

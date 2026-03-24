@@ -13,11 +13,11 @@
     <string name="quicklog_notes_label">Короткое структурированное описание</string>
     <string name="quicklog_medication_title">Лекарства</string>
     <string name="quicklog_medication_label">Что уже приняли?</string>
-    <string name="quicklog_dictation_start">Начать офлайн-диктовку</string>
-    <string name="quicklog_dictation_stop">Остановить офлайн-диктовку</string>
+    <string name="quicklog_dictation_start">Начать запись голоса</string>
+    <string name="quicklog_dictation_stop">Остановить запись голоса</string>
     <string name="quicklog_dictation_prompt">Опишите, что вы чувствуете</string>
     <string name="quicklog_dictation_saved">Диктовка сохранена: %1$s</string>
-    <string name="quicklog_dictation_unavailable">Офлайн-диктовка недоступна на этом устройстве.</string>
+    <string name="quicklog_dictation_unavailable">Голосовой ввод сейчас недоступен.</string>
     <string name="quicklog_voice_start">Начать голосовое заполнение</string>
     <string name="quicklog_voice_stop">Остановить голосовое заполнение</string>
     <string name="quicklog_save_now">Сохранить сейчас</string>
@@ -35,7 +35,7 @@
     <string name="quicklog_voice_status_processing">Обновляю черновик</string>
     <string name="quicklog_voice_status_listening_processing">Слушаю и обновляю</string>
     <string name="quicklog_live_now_title">Слышу сейчас</string>
-    <string name="quicklog_live_now_subtitle">Короткая пауза сама фиксирует фразу и запись продолжается без ручного перезапуска.</string>
+    <string name="quicklog_live_now_subtitle">Здесь показывается текущая фраза, пока приложение отправляет на API свежие фрагменты аудио.</string>
     <string name="quicklog_follow_up_preparing">Готовлю уточняющие вопросы</string>
     <string name="quicklog_follow_up_ready">Уточняющих вопросов готово: %1$d</string>
     <string name="quicklog_follow_up_hint">Откройте «Продолжить открытое», чтобы ответить на новые кнопки, чекбоксы и поля.</string>

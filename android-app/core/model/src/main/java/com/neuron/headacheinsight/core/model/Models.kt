@@ -272,7 +272,7 @@ data class ExportArtifact(
 
 @Serializable
 data class AppSettings(
-    val cloudAnalysisEnabled: Boolean = false,
+    val cloudAnalysisEnabled: Boolean = true,
     val backendBaseUrl: String = "http://10.0.2.2:8000/",
     val languageTag: String = "ru-RU",
     val languageSelectionCompleted: Boolean = false,
@@ -415,7 +415,7 @@ data class HomeDashboard(
     val pendingEpisode: Episode? = null,
     val lastEpisode: Episode? = null,
     val monthlyHeadacheDays: Int = 0,
-    val cloudEnabled: Boolean = false,
+    val cloudEnabled: Boolean = true,
     val queueCount: Int = 0,
 )
 

@@ -3,11 +3,11 @@
     <string name="home_info_subtitle">Сверху остаётся информация о состоянии, а главные действия находятся внизу для удобного нажатия одной рукой.</string>
     <string name="home_pain_button">У меня болит голова</string>
     <string name="home_status_title">Статус</string>
-    <string name="home_status_subtitle">Офлайн-ядро с опциональным облачным анализом</string>
+    <string name="home_status_subtitle">Прямое подключение к OpenAI и статус синхронизации на этом устройстве</string>
     <string name="home_actions_title">Основные действия</string>
     <string name="home_actions_subtitle">Самые важные кнопки находятся рядом с большим пальцем.</string>
     <string name="home_cloud_enabled">Облако включено</string>
-    <string name="home_local_only">Только локально</string>
+    <string name="home_local_only">Нужен API</string>
     <string name="home_queue_count">Очередь %1$d</string>
     <string name="home_monthly_headache_days">Дней с головной болью за месяц: %1$d</string>
     <string name="home_continue_episode">Продолжить открытое</string>
