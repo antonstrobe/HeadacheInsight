@@ -739,7 +739,7 @@ fun QuickLogScreen(
                 clearRecognizer = ::disposeSpeechRecognizer,
             )
             if (!started) {
-                onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+                scheduleRecognizerRestart(delayMillis = 900L)
             }
         }
     }
@@ -791,7 +791,7 @@ fun QuickLogScreen(
                     clearRecognizer = ::disposeSpeechRecognizer,
                 )
                 if (!started) {
-                    onVoiceError(context.getString(R.string.quicklog_dictation_unavailable))
+                    scheduleRecognizerRestart(delayMillis = 900L)
                 }
             }
         }
@@ -1175,15 +1175,16 @@ private fun startLiveRecognizer(
     setRecognizer: (SpeechRecognizer) -> Unit,
     clearRecognizer: () -> Unit,
 ): Boolean {
-    if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-        return false
-    }
     clearRecognizer()
     val preferOffline = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
         SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
     val recognizer = runCatching {
         if (preferOffline) {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            runCatching {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            }.getOrElse {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            }
         } else {
             SpeechRecognizer.createSpeechRecognizer(context)
         }
@@ -1285,7 +1286,7 @@ private fun buildLiveDictationIntent(
     putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.quicklog_dictation_prompt))
     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1300L)
-    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
-    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1200L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1300)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1200)
 }
