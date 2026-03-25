@@ -40,6 +40,9 @@ import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.CloudCredentials
 import com.neuron.headacheinsight.core.model.HandPreference
+import com.neuron.headacheinsight.core.model.OpenAiAutoModelId
+import com.neuron.headacheinsight.core.model.buildOpenAiModelCatalog
+import com.neuron.headacheinsight.core.model.isOpenAiAutoModel
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
 import com.neuron.headacheinsight.domain.BackendStatusRepository
@@ -90,7 +93,10 @@ data class SettingsUiState(
     val connectionState: ConnectionCheckState = ConnectionCheckState.IDLE,
     val connectionStatus: BackendConnectionStatus? = null,
     val connectionErrorMessage: String? = null,
-    val availableModels: List<String> = emptyList(),
+    val analysisModels: List<String> = emptyList(),
+    val questionModels: List<String> = emptyList(),
+    val transcribeModels: List<String> = emptyList(),
+    val supportedModelCount: Int = 0,
     val modelCatalogState: ModelCatalogState = ModelCatalogState.IDLE,
     val modelCatalogErrorMessage: String? = null,
 )
@@ -120,13 +126,21 @@ class SettingsViewModel @Inject constructor(
         connectionState,
         modelCatalogState,
     ) { settings, cloudCredentials, connection, models ->
+        val catalog = buildOpenAiModelCatalog(models.availableModels)
         SettingsUiState(
             appSettings = settings,
             cloudCredentials = cloudCredentials,
             connectionState = connection.state,
             connectionStatus = connection.status,
             connectionErrorMessage = connection.errorMessage,
-            availableModels = models.availableModels,
+            analysisModels = catalog.analysisModels,
+            questionModels = catalog.questionModels,
+            transcribeModels = catalog.transcribeModels,
+            supportedModelCount = listOf(
+                catalog.analysisModels,
+                catalog.questionModels,
+                catalog.transcribeModels,
+            ).flatten().distinct().size,
             modelCatalogState = models.state,
             modelCatalogErrorMessage = models.errorMessage,
         )
@@ -366,7 +380,7 @@ fun SettingsScreen(
         ) {
             ModelCatalogStatusBlock(
                 state = state.modelCatalogState,
-                availableModelsCount = state.availableModels.size,
+                availableModelsCount = state.supportedModelCount,
                 errorMessage = state.modelCatalogErrorMessage,
             )
             SectionActionRow {
@@ -383,22 +397,29 @@ fun SettingsScreen(
                     )
                 }
             }
+            Text(
+                text = stringResource(R.string.settings_models_auto_note),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = preferredTextAlign(),
+            )
             ModelDropdownField(
                 label = stringResource(R.string.settings_analysis_model_label),
                 selectedModel = analysisModelState,
-                availableModels = state.availableModels,
+                availableModels = state.analysisModels,
                 onModelSelected = { analysisModelState = it },
             )
             ModelDropdownField(
                 label = stringResource(R.string.settings_question_model_label),
                 selectedModel = questionModelState,
-                availableModels = state.availableModels,
+                availableModels = state.questionModels,
                 onModelSelected = { questionModelState = it },
             )
             ModelDropdownField(
                 label = stringResource(R.string.settings_transcribe_model_label),
                 selectedModel = transcribeModelState,
-                availableModels = state.availableModels,
+                availableModels = state.transcribeModels,
                 onModelSelected = { transcribeModelState = it },
             )
         }
@@ -432,6 +453,11 @@ fun SettingsScreen(
                 label = stringResource(R.string.settings_hand_preference_left),
                 selected = handPreferenceState == HandPreference.LEFT,
                 onClick = { handPreferenceState = HandPreference.LEFT },
+            )
+            SelectionOptionButton(
+                label = stringResource(R.string.settings_hand_preference_center),
+                selected = handPreferenceState == HandPreference.CENTER,
+                onClick = { handPreferenceState = HandPreference.CENTER },
             )
         }
 
@@ -526,6 +552,11 @@ private fun ModelDropdownField(
             availableModels = availableModels,
         )
     }
+    val displayModel = if (isOpenAiAutoModel(selectedModel)) {
+        stringResource(R.string.settings_models_auto)
+    } else {
+        selectedModel
+    }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -536,7 +567,7 @@ private fun ModelDropdownField(
         },
     ) {
         OutlinedTextField(
-            value = selectedModel,
+            value = displayModel,
             onValueChange = {},
             modifier = Modifier
                 .fillMaxWidth()
@@ -558,7 +589,11 @@ private fun ModelDropdownField(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = model,
+                            text = if (isOpenAiAutoModel(model)) {
+                                stringResource(R.string.settings_models_auto)
+                            } else {
+                                model
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = preferredTextAlign(),
                         )
@@ -577,6 +612,7 @@ private fun buildModelOptions(
     currentModel: String,
     availableModels: List<String>,
 ): List<String> = buildList {
+    add(OpenAiAutoModelId)
     currentModel.trim().takeIf(String::isNotBlank)?.let(::add)
     addAll(availableModels)
 }.map(String::trim)

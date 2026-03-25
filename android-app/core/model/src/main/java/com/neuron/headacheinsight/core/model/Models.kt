@@ -72,7 +72,7 @@ enum class UrgentActionLevel { NONE, MONITOR, DISCUSS_SOON, URGENT, EMERGENCY }
 enum class HypothesisConfidence { LOW, MEDIUM, HIGH }
 
 @Serializable
-enum class HandPreference { RIGHT, LEFT }
+enum class HandPreference { RIGHT, LEFT, CENTER }
 
 @Serializable
 data class UserProfile(
@@ -289,9 +289,9 @@ data class AppSettings(
 
 data class CloudCredentials(
     val apiKey: String = "",
-    val analysisModel: String = "gpt-4.1",
-    val questionModel: String = "gpt-4.1-mini",
-    val transcribeModel: String = "gpt-4o-transcribe",
+    val analysisModel: String = OpenAiAutoModelId,
+    val questionModel: String = OpenAiAutoModelId,
+    val transcribeModel: String = OpenAiAutoModelId,
 ) {
     val hasApiKey: Boolean
         get() = apiKey.isNotBlank()

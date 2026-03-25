@@ -1,6 +1,9 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.neuron.headacheinsight.data.repository
 
 import android.content.Context
+import com.neuron.headacheinsight.core.model.AnalysisRunPreview
 import com.neuron.headacheinsight.core.common.TimeProvider
 import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.AnalysisSnapshot
@@ -13,6 +16,7 @@ import com.neuron.headacheinsight.core.model.EpisodeDetail
 import com.neuron.headacheinsight.core.model.EpisodeTranscript
 import com.neuron.headacheinsight.core.model.Hypothesis
 import com.neuron.headacheinsight.core.model.HypothesisConfidence
+import com.neuron.headacheinsight.core.model.OpenAiModelTask
 import com.neuron.headacheinsight.core.model.OwnerType
 import com.neuron.headacheinsight.core.model.QuestionSource
 import com.neuron.headacheinsight.core.model.QuestionStage
@@ -24,11 +28,17 @@ import com.neuron.headacheinsight.core.model.UrgentActionLevel
 import com.neuron.headacheinsight.core.model.UserSummary
 import com.neuron.headacheinsight.core.model.VoiceIntakeDraft
 import com.neuron.headacheinsight.core.model.VoiceIntakeField
+import com.neuron.headacheinsight.core.model.estimateOpenAiTokens
+import com.neuron.headacheinsight.core.model.isOpenAiAutoModel
+import com.neuron.headacheinsight.core.model.recommendedAnalysisModel
+import com.neuron.headacheinsight.core.model.resolveConfiguredOpenAiModel
 import com.neuron.headacheinsight.data.remote.AnalyzeEpisodeRequest
 import com.neuron.headacheinsight.data.remote.BackendApi
 import com.neuron.headacheinsight.data.remote.GenerateFollowUpQuestionsRequest
 import com.neuron.headacheinsight.data.remote.OpenAiChatCompletionRequest
 import com.neuron.headacheinsight.data.remote.OpenAiChatMessage
+import com.neuron.headacheinsight.data.remote.OpenAiResponseFormat
+import com.neuron.headacheinsight.data.remote.OpenAiResponseJsonSchema
 import com.neuron.headacheinsight.data.remote.VoiceIntakeDraftRequest
 import com.neuron.headacheinsight.domain.AnalysisRepository
 import com.neuron.headacheinsight.domain.AttachmentRepository
@@ -53,16 +63,112 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
 @Singleton
+class OpenAiRuntimeModelResolver @Inject constructor(
+    private val backendApi: BackendApi,
+) {
+    @Volatile
+    private var cache: CachedModelList? = null
+
+    suspend fun loadAvailableModels(): List<String> {
+        val cached = cache
+        val now = System.currentTimeMillis()
+        if (cached != null && now - cached.loadedAtMillis <= CacheTtlMillis) {
+            return cached.modelIds
+        }
+
+        val loaded = runCatching {
+            backendApi.listModels()
+                .data
+                .map { it.id.trim() }
+                .filter(String::isNotBlank)
+                .distinct()
+        }.getOrDefault(emptyList())
+
+        if (loaded.isNotEmpty()) {
+            cache = CachedModelList(
+                loadedAtMillis = now,
+                modelIds = loaded,
+            )
+        }
+
+        return loaded
+    }
+
+    suspend fun resolveModel(
+        configuredModel: String,
+        task: OpenAiModelTask,
+        estimatedInputTokens: Int = 0,
+    ): String = resolveConfiguredOpenAiModel(
+        configuredModel = configuredModel.trim().ifBlank { "auto" },
+        availableModels = loadAvailableModels(),
+        task = task,
+        estimatedInputTokens = estimatedInputTokens,
+    )
+
+    suspend fun previewAnalysis(
+        configuredModel: String,
+        estimatedInputTokens: Int,
+    ): AnalysisRunPreview {
+        val normalizedConfigured = configuredModel.trim().ifBlank { "auto" }
+        val availableModels = loadAvailableModels()
+        val recommendedModel = recommendedAnalysisModel(
+            availableModels = availableModels,
+            estimatedInputTokens = estimatedInputTokens,
+        )
+        val automaticSelection = isOpenAiAutoModel(normalizedConfigured)
+        val effectiveModel = if (automaticSelection) {
+            recommendedModel
+        } else {
+            normalizedConfigured
+        }
+        val weakManualModel = effectiveModel.contains("mini", ignoreCase = true) ||
+            effectiveModel.contains("nano", ignoreCase = true) ||
+            effectiveModel.equals("gpt-4o", ignoreCase = true) ||
+            effectiveModel.equals("gpt-4.1-mini", ignoreCase = true)
+
+        return AnalysisRunPreview(
+            estimatedInputTokens = estimatedInputTokens,
+            configuredModel = normalizedConfigured,
+            effectiveModel = effectiveModel,
+            recommendedModel = recommendedModel,
+            automaticSelection = automaticSelection,
+            shouldSuggestRecommendedModel = !automaticSelection &&
+                effectiveModel != recommendedModel &&
+                (estimatedInputTokens >= 48_000 || weakManualModel),
+        )
+    }
+
+    private data class CachedModelList(
+        val loadedAtMillis: Long,
+        val modelIds: List<String>,
+    )
+
+    private companion object {
+        const val CacheTtlMillis: Long = 5 * 60 * 1000L
+    }
+}
+
+@Singleton
 class DefaultAnalysisRepository @Inject constructor(
+    private val openAiRuntimeModelResolver: OpenAiRuntimeModelResolver,
     private val backendApi: BackendApi,
     private val episodeRepository: EpisodeRepository,
     private val questionRepository: QuestionRepository,
@@ -75,33 +181,36 @@ class DefaultAnalysisRepository @Inject constructor(
         emit(episodeRepository.observeEpisodeDetail(ownerId).first()?.analyses?.firstOrNull())
     }
 
+    override suspend fun previewEpisodeAnalysis(ownerId: String): Result<AnalysisRunPreview> = runCatching {
+        val prepared = prepareEpisodeAnalysis(ownerId)
+        openAiRuntimeModelResolver.previewAnalysis(
+            configuredModel = prepared.configuredModel,
+            estimatedInputTokens = prepared.estimatedInputTokens,
+        )
+    }
+
     override suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse> = runCatching {
-        val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
+        val prepared = prepareEpisodeAnalysis(ownerId)
         val now = timeProvider.now()
-        val credentials = requireCloudCredentials()
         val response = backendApi.completeJson<OpenAiAnalysisDraft>(
-            model = credentials.analysisModel,
-            systemPrompt = buildEpisodeAnalysisSystemPrompt(episodeDetail.episode.locale),
-            userPayload = json.encodeToString(
-                AnalyzeEpisodeRequest.serializer(),
-                AnalyzeEpisodeRequest(
-                    ownerId = ownerId,
-                    locale = episodeDetail.episode.locale,
-                    episode = episodeDetail,
-                ),
-            ),
+            model = prepared.effectiveModel,
+            systemPrompt = prepared.systemPrompt,
+            userPayload = prepared.userPayload,
             json = json,
-            temperature = 0.2,
+            schemaName = "headache_analysis",
+            schema = HeadacheAnalysisSchema,
+            reasoningEffort = prepared.reasoningEffort,
+            temperature = prepared.temperature,
         ).toAnalysisResponse(
             ownerId = ownerId,
             generatedAt = now.toString(),
             createdAt = now,
-            locale = episodeDetail.episode.locale,
+            locale = prepared.locale,
         )
         persistAnalysis(
             ownerId = ownerId,
             response = response,
-            modelName = credentials.analysisModel,
+            modelName = prepared.effectiveModel,
             source = AnalysisSource.CLOUD,
         )
         if (response.nextQuestions.isNotEmpty()) {
@@ -114,25 +223,37 @@ class DefaultAnalysisRepository @Inject constructor(
         val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
         val credentials = requireCloudCredentials()
         val createdAt = timeProvider.now()
-        val questions = backendApi.completeJson<OpenAiQuestionDraftResponse>(
-            model = credentials.questionModel,
-            systemPrompt = buildFollowUpQuestionSystemPrompt(episodeDetail.episode.locale),
-            userPayload = json.encodeToString(
-                GenerateFollowUpQuestionsRequest.serializer(),
-                GenerateFollowUpQuestionsRequest(
-                    ownerId = ownerId,
-                    locale = episodeDetail.episode.locale,
-                    episode = episodeDetail,
-                ),
+        val systemPrompt = buildFollowUpQuestionSystemPrompt(episodeDetail.episode.locale)
+        val userPayload = json.encodeToString(
+            GenerateFollowUpQuestionsRequest.serializer(),
+            GenerateFollowUpQuestionsRequest(
+                ownerId = ownerId,
+                locale = episodeDetail.episode.locale,
+                episode = episodeDetail,
             ),
+        )
+        val estimatedInputTokens = estimateOpenAiTokens(systemPrompt, userPayload)
+        val model = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.questionModel,
+            task = OpenAiModelTask.QUESTIONS,
+            estimatedInputTokens = estimatedInputTokens,
+        )
+        val questions = backendApi.completeJson<OpenAiQuestionDraftResponse>(
+            model = model,
+            systemPrompt = systemPrompt,
+            userPayload = userPayload,
             json = json,
-            temperature = 0.3,
-        ).questions.mapIndexed { index, draft ->
-            draft.toQuestionTemplate(
+            schemaName = "headache_follow_up_questions",
+            schema = FollowUpQuestionListSchema,
+            reasoningEffort = model.reasoningEffortFor(OpenAiModelTask.QUESTIONS),
+            temperature = model.temperatureFor(OpenAiModelTask.QUESTIONS),
+        ).questions.mapNotNull { draft ->
+            draft.toQuestionTemplateOrNull(
                 locale = episodeDetail.episode.locale,
                 createdAt = createdAt,
-                position = index,
             )
+        }.mapIndexed { index, question ->
+            question.copy(priority = question.priority.coerceAtMost((100 - index).coerceAtLeast(1)))
         }
         if (questions.isNotEmpty()) {
             questionRepository.upsertGeneratedQuestions(questions)
@@ -147,27 +268,68 @@ class DefaultAnalysisRepository @Inject constructor(
         } else {
             val locale = episodeRepository.observeEpisodeDetail(ownerId).first()?.episode?.locale ?: "en-US"
             val credentials = requireCloudCredentials()
-            backendApi.completeJson<OpenAiAttachmentSummary>(
-                model = credentials.analysisModel,
-                systemPrompt = buildAttachmentSummarySystemPrompt(locale),
-                userPayload = json.encodeToString(
-                    AttachmentAnalysisPayload.serializer(),
-                    AttachmentAnalysisPayload(
-                        ownerId = ownerId,
-                        locale = locale,
-                        attachments = attachments.map {
-                            AttachmentDigest(
-                                displayName = it.displayName,
-                                mimeType = it.mimeType,
-                                extractedText = it.extractedText,
-                            )
-                        },
-                    ),
+            val systemPrompt = buildAttachmentSummarySystemPrompt(locale)
+            val userPayload = json.encodeToString(
+                AttachmentAnalysisPayload.serializer(),
+                AttachmentAnalysisPayload(
+                    ownerId = ownerId,
+                    locale = locale,
+                    attachments = attachments.map {
+                        AttachmentDigest(
+                            displayName = it.displayName,
+                            mimeType = it.mimeType,
+                            extractedText = it.extractedText,
+                        )
+                    },
                 ),
+            )
+            val estimatedInputTokens = estimateOpenAiTokens(systemPrompt, userPayload)
+            val model = openAiRuntimeModelResolver.resolveModel(
+                configuredModel = credentials.analysisModel,
+                task = OpenAiModelTask.ANALYSIS,
+                estimatedInputTokens = estimatedInputTokens,
+            )
+            backendApi.completeJson<OpenAiAttachmentSummary>(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPayload = userPayload,
                 json = json,
-                temperature = 0.2,
+                schemaName = "attachment_summary",
+                schema = AttachmentSummarySchema,
+                reasoningEffort = model.reasoningEffortFor(OpenAiModelTask.ANALYSIS),
+                temperature = model.temperatureFor(OpenAiModelTask.ANALYSIS),
             ).summary
         }
+    }
+
+    private suspend fun prepareEpisodeAnalysis(ownerId: String): PreparedAnalysisRequest {
+        val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
+        val credentials = requireCloudCredentials()
+        val systemPrompt = buildEpisodeAnalysisSystemPrompt(episodeDetail.episode.locale)
+        val userPayload = json.encodeToString(
+            AnalyzeEpisodeRequest.serializer(),
+            AnalyzeEpisodeRequest(
+                ownerId = ownerId,
+                locale = episodeDetail.episode.locale,
+                episode = episodeDetail,
+            ),
+        )
+        val estimatedInputTokens = estimateOpenAiTokens(systemPrompt, userPayload)
+        val effectiveModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.analysisModel,
+            task = OpenAiModelTask.ANALYSIS,
+            estimatedInputTokens = estimatedInputTokens,
+        )
+        return PreparedAnalysisRequest(
+            locale = episodeDetail.episode.locale,
+            configuredModel = credentials.analysisModel,
+            effectiveModel = effectiveModel,
+            systemPrompt = systemPrompt,
+            userPayload = userPayload,
+            estimatedInputTokens = estimatedInputTokens,
+            reasoningEffort = effectiveModel.reasoningEffortFor(OpenAiModelTask.ANALYSIS),
+            temperature = effectiveModel.temperatureFor(OpenAiModelTask.ANALYSIS),
+        )
     }
 
     private suspend fun persistAnalysis(
@@ -200,6 +362,7 @@ class DefaultAnalysisRepository @Inject constructor(
 
 @Singleton
 class DefaultBackendStatusRepository @Inject constructor(
+    private val openAiRuntimeModelResolver: OpenAiRuntimeModelResolver,
     private val backendApi: BackendApi,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
 ) : BackendStatusRepository {
@@ -207,12 +370,24 @@ class DefaultBackendStatusRepository @Inject constructor(
         val credentials = cloudCredentialsRepository.observeCredentials().first()
         require(credentials.apiKey.isNotBlank()) { "OpenAI API key is empty" }
         backendApi.listModels()
+        val analysisModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.analysisModel,
+            task = OpenAiModelTask.ANALYSIS,
+        )
+        val questionModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.questionModel,
+            task = OpenAiModelTask.QUESTIONS,
+        )
+        val transcribeModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.transcribeModel,
+            task = OpenAiModelTask.TRANSCRIPTION,
+        )
         BackendConnectionStatus(
             serviceName = "OpenAI API",
             apiKeyPresent = true,
-            analysisModel = credentials.analysisModel,
-            questionModel = credentials.questionModel,
-            transcribeModel = credentials.transcribeModel,
+            analysisModel = analysisModel,
+            questionModel = questionModel,
+            transcribeModel = transcribeModel,
         )
     }
 }
@@ -351,6 +526,7 @@ class LocalVoiceIntakeExtractor @Inject constructor() {
 
 @Singleton
 class DefaultVoiceIntakeRepository @Inject constructor(
+    private val openAiRuntimeModelResolver: OpenAiRuntimeModelResolver,
     private val backendApi: BackendApi,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val episodeRepository: EpisodeRepository,
@@ -369,24 +545,35 @@ class DefaultVoiceIntakeRepository @Inject constructor(
         return runCatching {
             val credentials = cloudCredentialsRepository.observeCredentials().first()
             require(credentials.apiKey.isNotBlank()) { "OpenAI API key is empty" }
-            val response = backendApi.completeJson<OpenAiVoiceIntakeDraft>(
-                model = credentials.analysisModel,
-                systemPrompt = buildVoiceIntakeSystemPrompt(locale),
-                userPayload = json.encodeToString(
-                    VoiceIntakeDraftRequest.serializer(),
-                    VoiceIntakeDraftRequest(
-                        ownerId = ownerId,
-                        locale = locale,
-                        transcriptText = normalized,
-                    ),
+            val systemPrompt = buildVoiceIntakeSystemPrompt(locale)
+            val userPayload = json.encodeToString(
+                VoiceIntakeDraftRequest.serializer(),
+                VoiceIntakeDraftRequest(
+                    ownerId = ownerId,
+                    locale = locale,
+                    transcriptText = normalized,
                 ),
+            )
+            val estimatedInputTokens = estimateOpenAiTokens(systemPrompt, userPayload)
+            val model = openAiRuntimeModelResolver.resolveModel(
+                configuredModel = credentials.analysisModel,
+                task = OpenAiModelTask.ANALYSIS,
+                estimatedInputTokens = estimatedInputTokens,
+            )
+            val response = backendApi.completeJson<OpenAiVoiceIntakeDraft>(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPayload = userPayload,
                 json = json,
-                temperature = 0.2,
+                schemaName = "voice_intake_draft",
+                schema = VoiceIntakeDraftSchema,
+                reasoningEffort = model.reasoningEffortFor(OpenAiModelTask.ANALYSIS),
+                temperature = model.temperatureFor(OpenAiModelTask.ANALYSIS),
             )
             val draft = response.toVoiceIntakeDraft(
                 ownerId = ownerId,
                 transcriptText = normalized,
-                engineName = "openai:${credentials.analysisModel}",
+                engineName = "openai:$model",
             )
             persistDraft(draft, AnalysisSource.CLOUD)
             draft
@@ -455,6 +642,7 @@ class SherpaOnnxLocalEngine @Inject constructor(
 
 @Singleton
 class BackendCloudSpeechEngine @Inject constructor(
+    private val openAiRuntimeModelResolver: OpenAiRuntimeModelResolver,
     private val backendApi: BackendApi,
     private val cloudCredentialsRepository: CloudCredentialsRepository,
     private val timeProvider: TimeProvider,
@@ -468,13 +656,17 @@ class BackendCloudSpeechEngine @Inject constructor(
         require(credentials.apiKey.isNotBlank()) { "OpenAI API key is empty" }
         val audioFile = File(audioPath)
         val episodeId = audioFile.nameWithoutExtension.substringBefore("_").ifBlank { audioFile.nameWithoutExtension }
+        val model = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.transcribeModel,
+            task = OpenAiModelTask.TRANSCRIPTION,
+        )
         val response = backendApi.transcribe(
             file = MultipartBody.Part.createFormData(
                 name = "file",
                 filename = audioFile.name,
                 body = audioFile.asRequestBody("audio/wav".toMediaType()),
             ),
-            model = credentials.transcribeModel.toRequestBody("text/plain".toMediaType()),
+            model = model.toRequestBody("text/plain".toMediaType()),
             language = languageHint
                 ?.substringBefore('-')
                 ?.lowercase(Locale.ROOT)
@@ -488,13 +680,24 @@ class BackendCloudSpeechEngine @Inject constructor(
             rawAudioPath = audioPath,
             transcriptText = response.text,
             language = response.language,
-            engineType = engineName,
+            engineType = "openai-transcribe:$model",
             variant = TranscriptVariant.CLOUD,
             confidence = null,
             createdAt = timeProvider.now(),
         )
     }
 }
+
+private data class PreparedAnalysisRequest(
+    val locale: String,
+    val configuredModel: String,
+    val effectiveModel: String,
+    val systemPrompt: String,
+    val userPayload: String,
+    val estimatedInputTokens: Int,
+    val reasoningEffort: String?,
+    val temperature: Double?,
+)
 
 @Serializable
 private data class OpenAiAnalysisDraft(
@@ -518,37 +721,37 @@ private data class OpenAiAnalysisDraft(
 private data class OpenAiUrgentActionDraft(
     val level: String? = null,
     val reasons: List<String> = emptyList(),
-    @SerialName("user_message") val userMessage: String? = null,
+    @JsonNames("user_message", "userMessage") val userMessage: String? = null,
 )
 
 @Serializable
 private data class OpenAiUserSummaryDraft(
-    @SerialName("plain_language_summary") val plainLanguageSummary: String? = null,
-    @SerialName("key_observations") val keyObservations: List<String> = emptyList(),
+    @JsonNames("plain_language_summary", "plainLanguageSummary") val plainLanguageSummary: String? = null,
+    @JsonNames("key_observations", "keyObservations") val keyObservations: List<String> = emptyList(),
 )
 
 @Serializable
 private data class OpenAiClinicianSummaryDraft(
-    @SerialName("concise_medical_context") val conciseMedicalContext: String? = null,
-    @SerialName("headache_day_estimate") val headacheDayEstimate: String? = null,
-    @SerialName("acute_medication_use_estimate") val acuteMedicationUseEstimate: String? = null,
-    @SerialName("functional_impact_summary") val functionalImpactSummary: String? = null,
+    @JsonNames("concise_medical_context", "conciseMedicalContext") val conciseMedicalContext: String? = null,
+    @JsonNames("headache_day_estimate", "headacheDayEstimate") val headacheDayEstimate: String? = null,
+    @JsonNames("acute_medication_use_estimate", "acuteMedicationUseEstimate") val acuteMedicationUseEstimate: String? = null,
+    @JsonNames("functional_impact_summary", "functionalImpactSummary") val functionalImpactSummary: String? = null,
 )
 
 @Serializable
 private data class OpenAiHypothesisDraft(
-    val label: String,
+    val label: String? = null,
     val confidence: String? = null,
     val rationale: String = "",
-    @SerialName("supporting_signals") val supportingSignals: List<String> = emptyList(),
-    @SerialName("missing_information") val missingInformation: List<String> = emptyList(),
-    @SerialName("discussion_with_doctor") val discussionWithDoctor: List<String> = emptyList(),
+    @JsonNames("supporting_signals", "supportingSignals") val supportingSignals: List<String> = emptyList(),
+    @JsonNames("missing_information", "missingInformation") val missingInformation: List<String> = emptyList(),
+    @JsonNames("discussion_with_doctor", "discussionWithDoctor") val discussionWithDoctor: List<String> = emptyList(),
 )
 
 @Serializable
 private data class OpenAiPatternDraft(
-    val type: String,
-    val description: String,
+    val type: String? = null,
+    val description: String? = null,
     val evidence: List<String> = emptyList(),
 )
 
@@ -561,17 +764,17 @@ private data class OpenAiQuestionDraftResponse(
 private data class OpenAiQuestionDraft(
     val category: String? = null,
     val stage: String? = null,
-    val prompt: String,
-    @SerialName("short_label") val shortLabel: String? = null,
-    @SerialName("help_text") val helpText: String? = null,
-    @SerialName("answer_type") val answerType: String? = null,
+    val prompt: String? = null,
+    @JsonNames("short_label", "shortLabel") val shortLabel: String? = null,
+    @JsonNames("help_text", "helpText") val helpText: String? = null,
+    @JsonNames("answer_type", "answerType") val answerType: String? = null,
     val options: List<String> = emptyList(),
     val priority: Int? = null,
     val required: Boolean? = null,
     val skippable: Boolean? = null,
-    @SerialName("voice_allowed") val voiceAllowed: Boolean? = null,
-    @SerialName("export_to_clinician") val exportToClinician: Boolean? = null,
-    @SerialName("red_flag_weight") val redFlagWeight: Int? = null,
+    @JsonNames("voice_allowed", "voiceAllowed") val voiceAllowed: Boolean? = null,
+    @JsonNames("export_to_clinician", "exportToClinician") val exportToClinician: Boolean? = null,
+    @JsonNames("red_flag_weight", "redFlagWeight") val redFlagWeight: Int? = null,
 )
 
 @Serializable
@@ -595,13 +798,13 @@ private data class AttachmentDigest(
 
 @Serializable
 private data class OpenAiVoiceIntakeDraft(
-    @SerialName("summary_text") val summaryText: String? = null,
+    @JsonNames("summary_text", "summaryText") val summaryText: String? = null,
     val severity: Int? = null,
     val symptoms: List<String> = emptyList(),
-    @SerialName("red_flags") val redFlags: List<String> = emptyList(),
+    @JsonNames("red_flags", "redFlags") val redFlags: List<String> = emptyList(),
     val medications: List<String> = emptyList(),
-    @SerialName("live_notes") val liveNotes: List<String> = emptyList(),
-    @SerialName("dynamic_fields") val dynamicFields: List<VoiceIntakeField> = emptyList(),
+    @JsonNames("live_notes", "liveNotes") val liveNotes: List<String> = emptyList(),
+    @JsonNames("dynamic_fields", "dynamicFields") val dynamicFields: List<VoiceIntakeField> = emptyList(),
 )
 
 private suspend inline fun <reified T> BackendApi.completeJson(
@@ -609,6 +812,9 @@ private suspend inline fun <reified T> BackendApi.completeJson(
     systemPrompt: String,
     userPayload: String,
     json: Json,
+    schemaName: String,
+    schema: JsonObject,
+    reasoningEffort: String? = null,
     temperature: Double? = null,
 ): T {
     val response = createChatCompletion(
@@ -618,6 +824,15 @@ private suspend inline fun <reified T> BackendApi.completeJson(
                 OpenAiChatMessage(role = "system", content = systemPrompt),
                 OpenAiChatMessage(role = "user", content = userPayload),
             ),
+            responseFormat = OpenAiResponseFormat(
+                type = "json_schema",
+                jsonSchema = OpenAiResponseJsonSchema(
+                    name = schemaName,
+                    schema = schema,
+                    strict = true,
+                ),
+            ),
+            reasoningEffort = reasoningEffort,
             temperature = temperature,
         ),
     )
@@ -628,39 +843,278 @@ private suspend inline fun <reified T> BackendApi.completeJson(
 
 private fun buildEpisodeAnalysisSystemPrompt(locale: String): String = """
 You are a headache intake analysis assistant.
-Return one JSON object only.
+Return exactly one JSON object that matches the provided schema.
 Use the input locale when writing human-readable text.
 Keep the result clinically careful, concise, and non-diagnostic.
 Allowed urgent_action.level values: NONE, MONITOR, DISCUSS_SOON, URGENT, EMERGENCY.
 Allowed hypothesis confidence values: LOW, MEDIUM, HIGH.
-For next_questions, use uppercase enum strings for stage and answer_type.
+For next_questions, use snake_case keys and uppercase enum strings for stage and answer_type.
+Only include next_questions when they are genuinely useful. Otherwise return an empty array.
 Prefer small focused question lists.
 """.trimIndent()
 
 private fun buildFollowUpQuestionSystemPrompt(locale: String): String = """
 You generate follow-up headache intake questions.
-Return one JSON object only with {"questions":[...]}.
+Return exactly one JSON object with {"questions":[...]} that matches the provided schema.
 Use the input locale for prompt text.
 Each question should be short, useful, and safe for patients.
 Allowed stage values: ACUTE_FAST, ACUTE_DETAIL, PROFILE, DOCTOR, ATTACHMENTS, REVIEW.
 Allowed answer_type values: BOOLEAN, SCALE, SINGLE_SELECT, MULTI_SELECT, FREE_TEXT, NUMBER, DATE_TIME, DURATION, ATTACHMENT_REQUEST, VOICE_NOTE, MEDICATION_LIST.
+Use snake_case keys exactly as defined by the schema.
 """.trimIndent()
 
 private fun buildAttachmentSummarySystemPrompt(locale: String): String = """
 You summarize attachment text for a headache diary app.
-Return one JSON object only with {"summary":[...]}.
+Return exactly one JSON object with {"summary":[...]} that matches the provided schema.
 Use the input locale.
 Each bullet should be short and factual.
 """.trimIndent()
 
 private fun buildVoiceIntakeSystemPrompt(locale: String): String = """
 You convert live patient dictation into a structured headache intake draft.
-Return one JSON object only.
+Return exactly one JSON object that matches the provided schema.
 Use the input locale for summary_text, symptoms, live_notes, and dynamic_fields labels.
 Allowed red_flags values: suddenWorstPain, confusion, speechDifficulty, oneSidedWeakness.
 Preserve custom symptoms when they are explicitly mentioned.
 Keep severity in range 0..10 when present.
 """.trimIndent()
+
+private fun String.reasoningEffortFor(task: OpenAiModelTask): String? =
+    if (startsWith("gpt-5", ignoreCase = true)) {
+        when (task) {
+            OpenAiModelTask.ANALYSIS -> "medium"
+            OpenAiModelTask.QUESTIONS -> "low"
+            OpenAiModelTask.TRANSCRIPTION -> null
+        }
+    } else {
+        null
+    }
+
+private fun String.temperatureFor(task: OpenAiModelTask): Double? =
+    if (startsWith("gpt-5", ignoreCase = true)) {
+        null
+    } else {
+        when (task) {
+            OpenAiModelTask.ANALYSIS -> 0.2
+            OpenAiModelTask.QUESTIONS -> 0.2
+            OpenAiModelTask.TRANSCRIPTION -> null
+        }
+    }
+
+private fun stringSchema(
+    enum: List<String> = emptyList(),
+): JsonObject = buildJsonObject {
+    put("type", "string")
+    if (enum.isNotEmpty()) {
+        putJsonArray("enum") {
+            enum.forEach { add(JsonPrimitive(it)) }
+        }
+    }
+}
+
+private fun nullableStringSchema(): JsonObject = buildJsonObject {
+    putJsonArray("type") {
+        add(JsonPrimitive("string"))
+        add(JsonPrimitive("null"))
+    }
+}
+
+private fun booleanSchema(): JsonObject = buildJsonObject {
+    put("type", "boolean")
+}
+
+private fun nullableBooleanSchema(): JsonObject = buildJsonObject {
+    putJsonArray("type") {
+        add(JsonPrimitive("boolean"))
+        add(JsonPrimitive("null"))
+    }
+}
+
+private fun integerSchema(): JsonObject = buildJsonObject {
+    put("type", "integer")
+}
+
+private fun nullableIntegerSchema(): JsonObject = buildJsonObject {
+    putJsonArray("type") {
+        add(JsonPrimitive("integer"))
+        add(JsonPrimitive("null"))
+    }
+}
+
+private fun arraySchema(items: JsonObject): JsonObject = buildJsonObject {
+    put("type", "array")
+    put("items", items)
+}
+
+private fun objectSchema(
+    required: List<String>,
+    properties: Map<String, JsonObject>,
+): JsonObject = buildJsonObject {
+    put("type", "object")
+    put("additionalProperties", false)
+    putJsonArray("required") {
+        required.forEach { add(JsonPrimitive(it)) }
+    }
+    putJsonObject("properties") {
+        properties.forEach { (key, value) ->
+            put(key, value)
+        }
+    }
+}
+
+private val StringListSchema: JsonObject = arraySchema(stringSchema())
+
+private val DynamicFieldSchema: JsonObject = objectSchema(
+    required = listOf("section", "label", "value"),
+    properties = linkedMapOf(
+        "section" to stringSchema(),
+        "label" to stringSchema(),
+        "value" to stringSchema(),
+    ),
+)
+
+private val QuestionDraftSchema: JsonObject = objectSchema(
+    required = listOf("prompt"),
+    properties = linkedMapOf(
+        "category" to nullableStringSchema(),
+        "stage" to nullableStringSchema(),
+        "prompt" to stringSchema(),
+        "short_label" to nullableStringSchema(),
+        "help_text" to nullableStringSchema(),
+        "answer_type" to nullableStringSchema(),
+        "options" to StringListSchema,
+        "priority" to nullableIntegerSchema(),
+        "required" to nullableBooleanSchema(),
+        "skippable" to nullableBooleanSchema(),
+        "voice_allowed" to nullableBooleanSchema(),
+        "export_to_clinician" to nullableBooleanSchema(),
+        "red_flag_weight" to nullableIntegerSchema(),
+    ),
+)
+
+private val HeadacheAnalysisSchema: JsonObject = objectSchema(
+    required = listOf(
+        "urgent_action",
+        "user_summary",
+        "clinician_summary",
+        "hypotheses",
+        "suspected_patterns",
+        "next_questions",
+        "suggested_tracking_fields",
+        "suggested_attachments",
+        "suggested_doctor_discussion_points",
+        "suggested_specialists",
+        "suggested_tests_or_evaluations",
+        "self_care_general",
+        "disclaimer",
+        "needs_human_clinician_review",
+    ),
+    properties = linkedMapOf(
+        "urgent_action" to objectSchema(
+            required = listOf("level", "reasons", "user_message"),
+            properties = linkedMapOf(
+                "level" to stringSchema(listOf("NONE", "MONITOR", "DISCUSS_SOON", "URGENT", "EMERGENCY")),
+                "reasons" to StringListSchema,
+                "user_message" to stringSchema(),
+            ),
+        ),
+        "user_summary" to objectSchema(
+            required = listOf("plain_language_summary", "key_observations"),
+            properties = linkedMapOf(
+                "plain_language_summary" to stringSchema(),
+                "key_observations" to StringListSchema,
+            ),
+        ),
+        "clinician_summary" to objectSchema(
+            required = listOf(
+                "concise_medical_context",
+                "headache_day_estimate",
+                "acute_medication_use_estimate",
+                "functional_impact_summary",
+            ),
+            properties = linkedMapOf(
+                "concise_medical_context" to stringSchema(),
+                "headache_day_estimate" to nullableStringSchema(),
+                "acute_medication_use_estimate" to nullableStringSchema(),
+                "functional_impact_summary" to nullableStringSchema(),
+            ),
+        ),
+        "hypotheses" to arraySchema(
+            objectSchema(
+                required = listOf(
+                    "label",
+                    "confidence",
+                    "rationale",
+                    "supporting_signals",
+                    "missing_information",
+                    "discussion_with_doctor",
+                ),
+                properties = linkedMapOf(
+                    "label" to stringSchema(),
+                    "confidence" to stringSchema(listOf("LOW", "MEDIUM", "HIGH")),
+                    "rationale" to stringSchema(),
+                    "supporting_signals" to StringListSchema,
+                    "missing_information" to StringListSchema,
+                    "discussion_with_doctor" to StringListSchema,
+                ),
+            ),
+        ),
+        "suspected_patterns" to arraySchema(
+            objectSchema(
+                required = listOf("type", "description", "evidence"),
+                properties = linkedMapOf(
+                    "type" to stringSchema(),
+                    "description" to stringSchema(),
+                    "evidence" to StringListSchema,
+                ),
+            ),
+        ),
+        "next_questions" to arraySchema(QuestionDraftSchema),
+        "suggested_tracking_fields" to StringListSchema,
+        "suggested_attachments" to StringListSchema,
+        "suggested_doctor_discussion_points" to StringListSchema,
+        "suggested_specialists" to StringListSchema,
+        "suggested_tests_or_evaluations" to StringListSchema,
+        "self_care_general" to StringListSchema,
+        "disclaimer" to stringSchema(),
+        "needs_human_clinician_review" to booleanSchema(),
+    ),
+)
+
+private val FollowUpQuestionListSchema: JsonObject = objectSchema(
+    required = listOf("questions"),
+    properties = linkedMapOf(
+        "questions" to arraySchema(QuestionDraftSchema),
+    ),
+)
+
+private val AttachmentSummarySchema: JsonObject = objectSchema(
+    required = listOf("summary"),
+    properties = linkedMapOf(
+        "summary" to StringListSchema,
+    ),
+)
+
+private val VoiceIntakeDraftSchema: JsonObject = objectSchema(
+    required = listOf(
+        "summary_text",
+        "severity",
+        "symptoms",
+        "red_flags",
+        "medications",
+        "live_notes",
+        "dynamic_fields",
+    ),
+    properties = linkedMapOf(
+        "summary_text" to stringSchema(),
+        "severity" to nullableIntegerSchema(),
+        "symptoms" to StringListSchema,
+        "red_flags" to StringListSchema,
+        "medications" to StringListSchema,
+        "live_notes" to StringListSchema,
+        "dynamic_fields" to arraySchema(DynamicFieldSchema),
+    ),
+)
 
 private fun OpenAiAnalysisDraft.toAnalysisResponse(
     ownerId: String,
@@ -668,8 +1122,10 @@ private fun OpenAiAnalysisDraft.toAnalysisResponse(
     createdAt: kotlinx.datetime.Instant,
     locale: String,
 ): AnalysisResponse {
-    val questions = nextQuestions.mapIndexed { index, draft ->
-        draft.toQuestionTemplate(locale = locale, createdAt = createdAt, position = index)
+    val questions = nextQuestions.mapNotNull { draft ->
+        draft.toQuestionTemplateOrNull(locale = locale, createdAt = createdAt)
+    }.mapIndexed { index, question ->
+        question.copy(priority = question.priority.coerceAtMost((100 - index).coerceAtLeast(1)))
     }
     return AnalysisResponse(
         schemaVersion = "v1",
@@ -692,24 +1148,8 @@ private fun OpenAiAnalysisDraft.toAnalysisResponse(
             acuteMedicationUseEstimate = clinicianSummary?.acuteMedicationUseEstimate,
             functionalImpactSummary = clinicianSummary?.functionalImpactSummary,
         ),
-        hypotheses = hypotheses.map {
-            Hypothesis(
-                id = UUID.randomUUID().toString(),
-                label = it.label,
-                confidence = it.confidence.toHypothesisConfidence(),
-                rationale = it.rationale,
-                supportingSignals = it.supportingSignals,
-                missingInformation = it.missingInformation,
-                discussionWithDoctor = it.discussionWithDoctor,
-            )
-        },
-        suspectedPatterns = suspectedPatterns.map {
-            SuspectedPattern(
-                type = it.type,
-                description = it.description,
-                evidence = it.evidence,
-            )
-        },
+        hypotheses = hypotheses.mapNotNull(OpenAiHypothesisDraft::toHypothesisOrNull),
+        suspectedPatterns = suspectedPatterns.mapNotNull(OpenAiPatternDraft::toPatternOrNull),
         nextQuestions = questions,
         suggestedTrackingFields = suggestedTrackingFields,
         suggestedAttachments = suggestedAttachments,
@@ -722,22 +1162,49 @@ private fun OpenAiAnalysisDraft.toAnalysisResponse(
     )
 }
 
-private fun OpenAiQuestionDraft.toQuestionTemplate(
+private fun OpenAiHypothesisDraft.toHypothesisOrNull(): Hypothesis? {
+    val normalizedLabel = label?.trim().orEmpty()
+    if (normalizedLabel.isBlank()) return null
+    return Hypothesis(
+        id = UUID.randomUUID().toString(),
+        label = normalizedLabel,
+        confidence = confidence.toHypothesisConfidence(),
+        rationale = rationale.trim(),
+        supportingSignals = supportingSignals.distinct(),
+        missingInformation = missingInformation.distinct(),
+        discussionWithDoctor = discussionWithDoctor.distinct(),
+    )
+}
+
+private fun OpenAiPatternDraft.toPatternOrNull(): SuspectedPattern? {
+    val normalizedType = type?.trim().orEmpty()
+    val normalizedDescription = description?.trim().orEmpty()
+    if (normalizedType.isBlank() || normalizedDescription.isBlank()) return null
+    return SuspectedPattern(
+        type = normalizedType,
+        description = normalizedDescription,
+        evidence = evidence.distinct(),
+    )
+}
+
+private fun OpenAiQuestionDraft.toQuestionTemplateOrNull(
     locale: String,
     createdAt: kotlinx.datetime.Instant,
-    position: Int,
-): QuestionTemplate = QuestionTemplate(
+): QuestionTemplate? {
+    val normalizedPrompt = prompt?.trim().orEmpty()
+    if (normalizedPrompt.isBlank()) return null
+    return QuestionTemplate(
     id = UUID.randomUUID().toString(),
     schemaVersion = "v1",
     source = QuestionSource.API,
     category = category?.takeIf(String::isNotBlank) ?: "headache",
     stage = stage.toQuestionStage(),
-    prompt = prompt.trim(),
-    shortLabel = shortLabel?.takeIf(String::isNotBlank) ?: prompt.take(48),
+    prompt = normalizedPrompt,
+    shortLabel = shortLabel?.takeIf(String::isNotBlank) ?: normalizedPrompt.take(48),
     helpText = helpText?.takeIf(String::isNotBlank),
     answerType = answerType.toAnswerType(),
     options = options.distinct(),
-    priority = (priority ?: (100 - position)).coerceIn(1, 100),
+    priority = (priority ?: 50).coerceIn(1, 100),
     required = required ?: false,
     skippable = skippable ?: true,
     voiceAllowed = voiceAllowed ?: true,
@@ -747,6 +1214,7 @@ private fun OpenAiQuestionDraft.toQuestionTemplate(
     createdAt = createdAt,
     active = true,
 )
+}
 
 private fun OpenAiVoiceIntakeDraft.toVoiceIntakeDraft(
     ownerId: String,

@@ -10,6 +10,10 @@
     <string name="questionnaire_analyzing">Идёт анализ...</string>
     <string name="questionnaire_generated_count">Готово новых уточняющих вопросов: %1$d</string>
     <string name="questionnaire_analysis_error">Ошибка анализа: %1$s</string>
+    <string name="questionnaire_analysis_preview_tokens">Примерный объём входа: %1$d токенов</string>
+    <string name="questionnaire_analysis_preview_auto_model">Автоматически выбрана модель: %1$s</string>
+    <string name="questionnaire_analysis_preview_manual_model">Выбранная модель: %1$s</string>
+    <string name="questionnaire_analysis_preview_recommendation">Рекомендация: для такого объёма лучше переключить анализ на %1$s.</string>
     <string name="questionnaire_episode_title">Открытый эпизод</string>
     <string name="questionnaire_episode_subtitle">Сверху краткое состояние, ниже появляются новые кнопки и поля по итогам анализа.</string>
     <string name="questionnaire_episode_status">Статус</string>

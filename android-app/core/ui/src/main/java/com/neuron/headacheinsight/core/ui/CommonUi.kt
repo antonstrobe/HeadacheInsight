@@ -162,7 +162,8 @@ fun ToggleSectionCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (LocalHandPreference.current == HandPreference.LEFT) {
+                val handPreference = LocalHandPreference.current
+                if (handPreference == HandPreference.LEFT) {
                     Switch(
                         checked = checked,
                         onCheckedChange = onCheckedChange,
@@ -174,7 +175,7 @@ fun ToggleSectionCard(
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = preferredTextAlign(),
                 )
-                if (LocalHandPreference.current == HandPreference.RIGHT) {
+                if (handPreference != HandPreference.LEFT) {
                     Switch(
                         checked = checked,
                         onCheckedChange = onCheckedChange,

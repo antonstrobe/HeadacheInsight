@@ -77,6 +77,7 @@ import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
 import com.neuron.headacheinsight.core.designsystem.preferredSpacedArrangement
 import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
 import com.neuron.headacheinsight.core.model.AnalysisResponse
+import com.neuron.headacheinsight.core.model.AnalysisRunPreview
 import com.neuron.headacheinsight.core.model.AnswerType
 import com.neuron.headacheinsight.core.model.EpisodeDetail
 import com.neuron.headacheinsight.core.model.HandPreference
@@ -101,6 +102,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -114,6 +116,7 @@ private data class QuestionnaireViewDraft(
     val isAnalyzing: Boolean = false,
     val analysisError: String? = null,
     val generatedQuestionCount: Int? = null,
+    val analysisPreview: AnalysisRunPreview? = null,
 )
 
 data class QuestionnaireUiState(
@@ -123,6 +126,7 @@ data class QuestionnaireUiState(
     val isAnalyzing: Boolean = false,
     val analysisError: String? = null,
     val generatedQuestionCount: Int? = null,
+    val analysisPreview: AnalysisRunPreview? = null,
 )
 
 @EntryPoint
@@ -160,8 +164,22 @@ class QuestionnaireViewModel @Inject constructor(
             isAnalyzing = uiDraft.isAnalyzing,
             analysisError = uiDraft.analysisError,
             generatedQuestionCount = uiDraft.generatedQuestionCount,
+            analysisPreview = uiDraft.analysisPreview,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QuestionnaireUiState())
+
+    init {
+        viewModelScope.launch {
+            episodeRepository.observeEpisodeDetail(episodeId).collectLatest { detail ->
+                val preview = if (detail == null) {
+                    null
+                } else {
+                    analysisRepository.previewEpisodeAnalysis(episodeId).getOrNull()
+                }
+                draft.emit(draft.value.copy(analysisPreview = preview))
+            }
+        }
+    }
 
     fun saveAnswer(questionId: String, payload: JsonElement) {
         viewModelScope.launch {
@@ -176,7 +194,7 @@ class QuestionnaireViewModel @Inject constructor(
 
     fun analyzeEpisode() {
         viewModelScope.launch {
-            draft.emit(QuestionnaireViewDraft(isAnalyzing = true))
+            draft.emit(draft.value.copy(isAnalyzing = true, analysisError = null))
             analysisRepository.analyzeEpisode(episodeId).fold(
                 onSuccess = { response ->
                     val generatedCount = if (response.nextQuestions.isNotEmpty()) {
@@ -185,7 +203,7 @@ class QuestionnaireViewModel @Inject constructor(
                         analysisRepository.generateFollowUpQuestions(episodeId).getOrDefault(emptyList()).size
                     }
                     draft.emit(
-                        QuestionnaireViewDraft(
+                        draft.value.copy(
                             isAnalyzing = false,
                             generatedQuestionCount = generatedCount.takeIf { it > 0 },
                         ),
@@ -193,7 +211,7 @@ class QuestionnaireViewModel @Inject constructor(
                 },
                 onFailure = { error ->
                     draft.emit(
-                        QuestionnaireViewDraft(
+                        draft.value.copy(
                             isAnalyzing = false,
                             analysisError = error.message,
                         ),
@@ -296,10 +314,48 @@ fun QuestionnaireScreen(
                             color = HeadacheInsightStatusColors.CloudAnalyzed,
                         )
                     }
+                    state.analysisPreview?.let { preview ->
+                        Text(
+                            text = stringResource(
+                                R.string.questionnaire_analysis_preview_tokens,
+                                preview.estimatedInputTokens,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = preferredTextAlign(),
+                        )
+                        Text(
+                            text = if (preview.automaticSelection) {
+                                stringResource(
+                                    R.string.questionnaire_analysis_preview_auto_model,
+                                    preview.effectiveModel,
+                                )
+                            } else {
+                                stringResource(
+                                    R.string.questionnaire_analysis_preview_manual_model,
+                                    preview.effectiveModel,
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = preferredTextAlign(),
+                        )
+                        if (preview.shouldSuggestRecommendedModel) {
+                            Text(
+                                text = stringResource(
+                                    R.string.questionnaire_analysis_preview_recommendation,
+                                    preview.recommendedModel,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.tertiary,
+                                textAlign = preferredTextAlign(),
+                            )
+                        }
+                    }
                     state.analysisError?.let {
                         Text(
                             text = stringResource(R.string.questionnaire_analysis_error, it),
                             color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = preferredTextAlign(),
                         )
                     }
                 }

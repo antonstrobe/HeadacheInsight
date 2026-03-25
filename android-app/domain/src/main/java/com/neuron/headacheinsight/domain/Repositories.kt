@@ -1,6 +1,7 @@
 package com.neuron.headacheinsight.domain
 
 import com.neuron.headacheinsight.core.model.AnalysisResponse
+import com.neuron.headacheinsight.core.model.AnalysisRunPreview
 import com.neuron.headacheinsight.core.model.AnalysisSnapshot
 import com.neuron.headacheinsight.core.model.AppSettings
 import com.neuron.headacheinsight.core.model.Attachment
@@ -81,6 +82,7 @@ interface AttachmentRepository {
 
 interface AnalysisRepository {
     fun observeLatestAnalysis(ownerId: String): Flow<AnalysisSnapshot?>
+    suspend fun previewEpisodeAnalysis(ownerId: String): Result<AnalysisRunPreview>
     suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse>
     suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>>
     suspend fun analyzeAttachments(ownerId: String): Result<List<String>>

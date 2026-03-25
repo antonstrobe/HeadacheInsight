@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.neuron.headacheinsight.core.model.CloudCredentials
+import com.neuron.headacheinsight.core.model.OpenAiAutoModelId
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import dagger.Binds
 import dagger.Module
@@ -46,7 +47,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
         analysisModel = prefs.getString(KEY_ANALYSIS_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_ANALYSIS_MODEL },
         questionModel = prefs.getString(KEY_QUESTION_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_QUESTION_MODEL },
         transcribeModel = prefs.getString(KEY_TRANSCRIBE_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_TRANSCRIBE_MODEL },
-    )
+    ).normalized()
 
     private fun encrypt(value: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -88,7 +89,10 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
 
     private fun CloudCredentials.normalized(): CloudCredentials = copy(
         analysisModel = analysisModel.ifBlank { DEFAULT_ANALYSIS_MODEL },
-        questionModel = questionModel.ifBlank { DEFAULT_QUESTION_MODEL },
+        questionModel = when (questionModel.ifBlank { DEFAULT_QUESTION_MODEL }) {
+            LEGACY_QUESTION_MODEL -> DEFAULT_QUESTION_MODEL
+            else -> questionModel.ifBlank { DEFAULT_QUESTION_MODEL }
+        },
         transcribeModel = transcribeModel.ifBlank { DEFAULT_TRANSCRIBE_MODEL },
     )
 
@@ -103,9 +107,10 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val IV_SIZE = 12
         const val GCM_TAG_SIZE = 128
-        const val DEFAULT_ANALYSIS_MODEL = "gpt-4.1"
-        const val DEFAULT_QUESTION_MODEL = "gpt-4.1-mini"
-        const val DEFAULT_TRANSCRIBE_MODEL = "gpt-4o-transcribe"
+        const val DEFAULT_ANALYSIS_MODEL = OpenAiAutoModelId
+        const val DEFAULT_QUESTION_MODEL = OpenAiAutoModelId
+        const val DEFAULT_TRANSCRIBE_MODEL = OpenAiAutoModelId
+        const val LEGACY_QUESTION_MODEL = "gpt-4.1-mini"
     }
 }
 

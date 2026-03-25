@@ -8,6 +8,10 @@
     <string name="questionnaire_analyzing">Analyzing...</string>
     <string name="questionnaire_generated_count">%1$d new follow-up questions ready</string>
     <string name="questionnaire_analysis_error">Analysis error: %1$s</string>
+    <string name="questionnaire_analysis_preview_tokens">Approximate input size: %1$d tokens</string>
+    <string name="questionnaire_analysis_preview_auto_model">Automatic model: %1$s</string>
+    <string name="questionnaire_analysis_preview_manual_model">Selected model: %1$s</string>
+    <string name="questionnaire_analysis_preview_recommendation">Recommendation: switch the analysis model to %1$s for a stronger result on this payload.</string>
     <string name="questionnaire_episode_title">Open episode</string>
     <string name="questionnaire_episode_subtitle">This block stays compact, while analysis builds the next controls below.</string>
     <string name="questionnaire_episode_status">Status</string>

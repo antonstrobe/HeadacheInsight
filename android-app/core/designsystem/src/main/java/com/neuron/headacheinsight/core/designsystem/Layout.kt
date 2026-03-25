@@ -12,15 +12,27 @@ val LocalHandPreference = staticCompositionLocalOf { HandPreference.RIGHT }
 
 @Composable
 fun preferredHorizontalAlignment(): Alignment.Horizontal =
-    if (LocalHandPreference.current == HandPreference.RIGHT) Alignment.End else Alignment.Start
+    when (LocalHandPreference.current) {
+        HandPreference.RIGHT -> Alignment.End
+        HandPreference.LEFT -> Alignment.Start
+        HandPreference.CENTER -> Alignment.CenterHorizontally
+    }
 
 @Composable
 fun preferredTextAlign(): TextAlign =
-    if (LocalHandPreference.current == HandPreference.RIGHT) TextAlign.End else TextAlign.Start
+    when (LocalHandPreference.current) {
+        HandPreference.RIGHT -> TextAlign.End
+        HandPreference.LEFT -> TextAlign.Start
+        HandPreference.CENTER -> TextAlign.Center
+    }
 
 @Composable
 fun preferredHorizontalArrangement(): Arrangement.Horizontal =
-    if (LocalHandPreference.current == HandPreference.RIGHT) Arrangement.End else Arrangement.Start
+    when (LocalHandPreference.current) {
+        HandPreference.RIGHT -> Arrangement.End
+        HandPreference.LEFT -> Arrangement.Start
+        HandPreference.CENTER -> Arrangement.Center
+    }
 
 @Composable
 fun preferredSpacedArrangement(space: Dp): Arrangement.Horizontal =

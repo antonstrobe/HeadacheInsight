@@ -5,6 +5,7 @@ import com.neuron.headacheinsight.core.model.EpisodeDetail
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class AnalyzeEpisodeRequest(
@@ -54,6 +55,7 @@ data class OpenAiChatCompletionRequest(
     val model: String,
     val messages: List<OpenAiChatMessage>,
     @SerialName("response_format") val responseFormat: OpenAiResponseFormat = OpenAiResponseFormat(),
+    @SerialName("reasoning_effort") val reasoningEffort: String? = null,
     val temperature: Double? = null,
 )
 
@@ -66,6 +68,14 @@ data class OpenAiChatMessage(
 @Serializable
 data class OpenAiResponseFormat(
     val type: String = "json_object",
+    @SerialName("json_schema") val jsonSchema: OpenAiResponseJsonSchema? = null,
+)
+
+@Serializable
+data class OpenAiResponseJsonSchema(
+    val name: String,
+    val schema: JsonObject,
+    val strict: Boolean = true,
 )
 
 @Serializable
