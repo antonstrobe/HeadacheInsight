@@ -139,7 +139,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = stringResource(R.string.home_analyze_all),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )
                         }
