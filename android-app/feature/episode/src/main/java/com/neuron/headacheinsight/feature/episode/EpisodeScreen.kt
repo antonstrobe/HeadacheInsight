@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.neuron.headacheinsight.core.designsystem.HeadacheInsightSectionCard
 import com.neuron.headacheinsight.core.designsystem.KeyValueLine
 import com.neuron.headacheinsight.core.model.EpisodeDetail
+import com.neuron.headacheinsight.core.ui.AnalysisSnapshotCard
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.localizedAttachmentType
 import com.neuron.headacheinsight.core.ui.localizedRedFlagStatus
@@ -145,9 +146,21 @@ fun EpisodeScreen(
             }
         }
         item {
-            HeadacheInsightSectionCard(title = stringResource(R.string.episode_analysis_title)) {
-                state.analyses.forEach { analysis ->
-                    Text(stringResource(R.string.episode_analysis_line, analysis.modelName, analysis.status.name))
+            HeadacheInsightSectionCard(
+                title = stringResource(R.string.episode_analysis_title),
+                supportingText = stringResource(R.string.episode_analysis_subtitle),
+            ) {
+                if (state.analyses.isEmpty()) {
+                    Text(stringResource(R.string.episode_analysis_empty))
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        state.analyses.forEach { analysis ->
+                            AnalysisSnapshotCard(snapshot = analysis)
+                        }
+                    }
                 }
             }
         }

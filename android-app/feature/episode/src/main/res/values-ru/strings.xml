@@ -10,6 +10,8 @@
     <string name="episode_attachments_title">Вложения</string>
     <string name="episode_answers_title">Уточняющие ответы</string>
     <string name="episode_analysis_title">Снимки анализа</string>
+    <string name="episode_analysis_subtitle">Здесь сохраняются AI-анализы и структурированные заметки по этому эпизоду.</string>
+    <string name="episode_analysis_empty">Для этого эпизода пока нет сохранённых анализов.</string>
     <string name="episode_symptom_line">%1$s • %2$s</string>
     <string name="episode_transcript_line">%1$s: %2$s</string>
     <string name="episode_attachment_line">%1$s • %2$s</string>

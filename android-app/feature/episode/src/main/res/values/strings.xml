@@ -10,6 +10,8 @@
     <string name="episode_attachments_title">Attachments</string>
     <string name="episode_answers_title">Follow-up answers</string>
     <string name="episode_analysis_title">Analysis snapshots</string>
+    <string name="episode_analysis_subtitle">Saved AI analyses and structured note drafts for this episode.</string>
+    <string name="episode_analysis_empty">There are no saved analyses for this episode yet.</string>
     <string name="episode_symptom_line">%1$s • %2$s</string>
     <string name="episode_transcript_line">%1$s: %2$s</string>
     <string name="episode_attachment_line">%1$s • %2$s</string>

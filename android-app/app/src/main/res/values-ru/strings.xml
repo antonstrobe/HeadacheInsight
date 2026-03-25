@@ -10,4 +10,8 @@
     <string name="language_next_title">Следующие языки</string>
     <string name="language_next_subtitle">Селектор будет расширяться постепенно.</string>
     <string name="language_next_description">В первой версии выбор языка упрощён: на старте доступны две большие кнопки.</string>
+    <string name="update_dialog_title">Доступно обновление</string>
+    <string name="update_dialog_message">Эта сборка использует коммит %1$s, а в GitHub уже есть %2$s. Открыть страницу обновления?</string>
+    <string name="update_dialog_confirm">Открыть обновление</string>
+    <string name="update_dialog_dismiss">Позже</string>
 </resources>

@@ -10,6 +10,8 @@
     <string name="reports_all_analysis_error">Analysis error: %1$s</string>
     <string name="reports_all_analysis_result_title">Longitudinal analysis</string>
     <string name="reports_all_analysis_result_subtitle">The app looked across the stored history instead of a single episode.</string>
+    <string name="reports_all_analysis_history_title">Saved global analyses</string>
+    <string name="reports_all_analysis_history_subtitle">Every full-history run stays here so you can reopen it later.</string>
     <string name="reports_all_analysis_hypotheses">Key hypotheses</string>
     <string name="reports_all_analysis_doctor_points">Doctor discussion points</string>
     <string name="reports_all_analysis_self_care">Self-care guidance</string>

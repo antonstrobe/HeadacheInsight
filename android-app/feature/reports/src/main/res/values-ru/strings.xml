@@ -14,6 +14,8 @@
     <string name="reports_all_analysis_error">Ошибка анализа: %1$s</string>
     <string name="reports_all_analysis_result_title">Продольный анализ</string>
     <string name="reports_all_analysis_result_subtitle">Здесь учитывается вся сохранённая история, а не один эпизод.</string>
+    <string name="reports_all_analysis_history_title">Сохранённые глобальные анализы</string>
+    <string name="reports_all_analysis_history_subtitle">Каждый полный разбор истории остаётся здесь, чтобы его можно было открыть позже.</string>
     <string name="reports_all_analysis_hypotheses">Ключевые гипотезы</string>
     <string name="reports_all_analysis_doctor_points">Что обсудить с врачом</string>
     <string name="reports_all_analysis_self_care">Подсказки по самопомощи</string>

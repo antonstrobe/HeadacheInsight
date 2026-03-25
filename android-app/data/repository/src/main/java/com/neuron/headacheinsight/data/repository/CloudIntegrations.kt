@@ -9,6 +9,7 @@ import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.AnalysisSnapshot
 import com.neuron.headacheinsight.core.model.AnalysisSource
 import com.neuron.headacheinsight.core.model.AnalysisStatus
+import com.neuron.headacheinsight.core.model.AllDataAnalysisOwnerId
 import com.neuron.headacheinsight.core.model.AnswerType
 import com.neuron.headacheinsight.core.model.BackendConnectionStatus
 import com.neuron.headacheinsight.core.model.ClinicianSummary
@@ -32,6 +33,8 @@ import com.neuron.headacheinsight.core.model.estimateOpenAiTokens
 import com.neuron.headacheinsight.core.model.isOpenAiAutoModel
 import com.neuron.headacheinsight.core.model.recommendedAnalysisModel
 import com.neuron.headacheinsight.core.model.resolveConfiguredOpenAiModel
+import com.neuron.headacheinsight.data.local.AnalysisDao
+import com.neuron.headacheinsight.data.local.toModel
 import com.neuron.headacheinsight.data.remote.AnalyzeEpisodeRequest
 import com.neuron.headacheinsight.data.remote.BackendApi
 import com.neuron.headacheinsight.data.remote.GenerateFollowUpQuestionsRequest
@@ -62,6 +65,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNames
@@ -170,6 +174,7 @@ class OpenAiRuntimeModelResolver @Inject constructor(
 class DefaultAnalysisRepository @Inject constructor(
     private val openAiRuntimeModelResolver: OpenAiRuntimeModelResolver,
     private val backendApi: BackendApi,
+    private val analysisDao: AnalysisDao,
     private val episodeRepository: EpisodeRepository,
     private val questionRepository: QuestionRepository,
     private val attachmentRepository: AttachmentRepository,
@@ -177,8 +182,14 @@ class DefaultAnalysisRepository @Inject constructor(
     private val timeProvider: TimeProvider,
     private val json: Json,
 ) : AnalysisRepository {
-    override fun observeLatestAnalysis(ownerId: String) = kotlinx.coroutines.flow.flow {
-        emit(episodeRepository.observeEpisodeDetail(ownerId).first()?.analyses?.firstOrNull())
+    override fun observeLatestAnalysis(ownerId: String) = analysisDao.observeLatest(ownerId).map { it?.toModel() }
+
+    override fun observeAnalysisHistory(ownerId: String) = analysisDao.observeByOwner(ownerId).map { list ->
+        list.map { it.toModel() }
+    }
+
+    override fun observeAllAnalysisHistory() = analysisDao.observeAll().map { list ->
+        list.map { it.toModel() }
     }
 
     override suspend fun previewEpisodeAnalysis(ownerId: String): Result<AnalysisRunPreview> = runCatching {
@@ -209,6 +220,8 @@ class DefaultAnalysisRepository @Inject constructor(
         )
         persistAnalysis(
             ownerId = ownerId,
+            ownerType = OwnerType.EPISODE,
+            requestPayload = prepared.userPayload,
             response = response,
             modelName = prepared.effectiveModel,
             source = AnalysisSource.CLOUD,
@@ -242,7 +255,7 @@ class DefaultAnalysisRepository @Inject constructor(
             locale = locale,
         )
         val now = timeProvider.now()
-        backendApi.completeJson<OpenAiAnalysisDraft>(
+        val response = backendApi.completeJson<OpenAiAnalysisDraft>(
             model = prepared.effectiveModel,
             systemPrompt = prepared.systemPrompt,
             userPayload = prepared.userPayload,
@@ -252,12 +265,21 @@ class DefaultAnalysisRepository @Inject constructor(
             reasoningEffort = prepared.reasoningEffort,
             temperature = prepared.temperature,
         ).toAnalysisResponse(
-            ownerId = "all-data",
+            ownerId = AllDataAnalysisOwnerId,
             generatedAt = now.toString(),
             createdAt = now,
             locale = prepared.locale,
             ownerType = OwnerType.PROFILE,
         )
+        persistAnalysis(
+            ownerId = AllDataAnalysisOwnerId,
+            ownerType = OwnerType.PROFILE,
+            requestPayload = prepared.userPayload,
+            response = response,
+            modelName = prepared.effectiveModel,
+            source = AnalysisSource.CLOUD,
+        )
+        response
     }
 
     override suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>> = runCatching {
@@ -399,6 +421,8 @@ class DefaultAnalysisRepository @Inject constructor(
 
     private suspend fun persistAnalysis(
         ownerId: String,
+        ownerType: OwnerType,
+        requestPayload: String,
         response: AnalysisResponse,
         modelName: String,
         source: AnalysisSource,
@@ -406,10 +430,10 @@ class DefaultAnalysisRepository @Inject constructor(
         episodeRepository.upsertAnalysis(
             AnalysisSnapshot(
                 id = response.analysisId,
-                ownerType = OwnerType.EPISODE,
+                ownerType = ownerType,
                 ownerId = ownerId,
                 schemaVersion = response.schemaVersion,
-                requestPayloadJson = "{}",
+                requestPayloadJson = requestPayload,
                 responsePayloadJson = json.encodeToString(AnalysisResponse.serializer(), response),
                 modelName = modelName,
                 createdAt = timeProvider.now(),

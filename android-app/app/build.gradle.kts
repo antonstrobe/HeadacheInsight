@@ -6,6 +6,39 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun runCommand(vararg command: String): String {
+    return try {
+        val process = ProcessBuilder(*command)
+            .directory(rootDir.parentFile)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        process.waitFor()
+        if (process.exitValue() == 0) {
+            output
+        } else {
+            ""
+        }
+    } catch (_: Exception) {
+        ""
+    }
+}
+
+fun normalizeGithubUrl(remoteUrl: String): String = when {
+    remoteUrl.startsWith("git@github.com:") -> {
+        "https://github.com/" + remoteUrl.removePrefix("git@github.com:").removeSuffix(".git")
+    }
+    remoteUrl.startsWith("https://github.com/") -> remoteUrl.removeSuffix(".git")
+    else -> "https://github.com/antonstrobe/HeadacheInsight"
+}
+
+fun String.asBuildConfigString(): String =
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val gitSha = runCommand("git", "rev-parse", "--short=12", "HEAD").ifBlank { "unknown" }
+val repoUrl = normalizeGithubUrl(runCommand("git", "remote", "get-url", "origin"))
+val releasesUrl = "$repoUrl/releases"
+
 android {
     namespace = "com.neuron.headacheinsight"
     compileSdk = 35
@@ -18,6 +51,9 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "com.neuron.headacheinsight.app.HeadacheInsightTestRunner"
         vectorDrawables.useSupportLibrary = true
+        buildConfigField("String", "APP_GIT_SHA", gitSha.asBuildConfigString())
+        buildConfigField("String", "APP_REPO_URL", repoUrl.asBuildConfigString())
+        buildConfigField("String", "APP_RELEASES_URL", releasesUrl.asBuildConfigString())
     }
 
     flavorDimensions += "environment"

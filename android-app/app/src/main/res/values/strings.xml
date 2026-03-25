@@ -10,4 +10,8 @@
     <string name="language_next_title">Next languages</string>
     <string name="language_next_subtitle">The selector will grow over time.</string>
     <string name="language_next_description">This first version keeps language selection simple: two large buttons at startup.</string>
+    <string name="update_dialog_title">Update available</string>
+    <string name="update_dialog_message">This build uses commit %1$s, while GitHub already has %2$s. Open the update page?</string>
+    <string name="update_dialog_confirm">Open update</string>
+    <string name="update_dialog_dismiss">Later</string>
 </resources>

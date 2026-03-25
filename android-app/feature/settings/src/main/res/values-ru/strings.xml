@@ -42,6 +42,12 @@
     <string name="settings_local_speech_status_scheduled">Статус: Android поставил загрузку в очередь</string>
     <string name="settings_local_speech_status_unsupported">Статус: устройство не поддерживает этот режим</string>
     <string name="settings_local_speech_status_error">Статус: ошибка установки</string>
+    <string name="settings_display_title">Отображение</string>
+    <string name="settings_display_subtitle">Можно сделать текст компактнее по умолчанию или увеличить его, если текущий размер слишком мелкий.</string>
+    <string name="settings_text_scale_label">Размер текста</string>
+    <string name="settings_text_scale_value">Текущий масштаб: %1$.0f%%</string>
+    <string name="settings_updates_title">Проверять обновления при запуске</string>
+    <string name="settings_updates_subtitle">При старте приложение сравнивает текущую сборку с GitHub и спрашивает, открыть ли страницу обновления. Если интернета нет, запуск продолжается как обычно.</string>
     <string name="settings_language_title">Язык</string>
     <string name="settings_language_subtitle">Выберите язык интерфейса приложения. По умолчанию при первом запуске используется русский.</string>
     <string name="settings_language_russian">Русский</string>

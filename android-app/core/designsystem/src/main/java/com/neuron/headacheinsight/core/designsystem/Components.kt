@@ -48,13 +48,13 @@ fun HeadacheInsightSectionCard(
         border = BorderStroke(1.dp, resolvedBorderColor),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalAlignment = preferredHorizontalAlignment(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(width = 44.dp, height = 4.dp)
+                    .size(width = 40.dp, height = 4.dp)
                     .background(resolvedAccentColor, MaterialTheme.shapes.small)
                     .align(preferredHorizontalAlignment()),
             )

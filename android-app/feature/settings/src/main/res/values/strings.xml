@@ -43,6 +43,12 @@
     <string name="settings_local_speech_status_scheduled">Status: scheduled by Android</string>
     <string name="settings_local_speech_status_unsupported">Status: not supported on this device</string>
     <string name="settings_local_speech_status_error">Status: install error</string>
+    <string name="settings_display_title">Display</string>
+    <string name="settings_display_subtitle">Make text denser by default, or enlarge it if the current size is too small.</string>
+    <string name="settings_text_scale_label">Text size</string>
+    <string name="settings_text_scale_value">Current scale: %1$.0f%%</string>
+    <string name="settings_updates_title">Check for updates at startup</string>
+    <string name="settings_updates_subtitle">At launch the app compares this build with GitHub and asks whether to open the update page. If there is no internet, startup continues normally.</string>
     <string name="settings_language_title">Language</string>
     <string name="settings_language_subtitle">Choose the app interface language. Russian is the default startup option.</string>
     <string name="settings_language_russian">Russian</string>

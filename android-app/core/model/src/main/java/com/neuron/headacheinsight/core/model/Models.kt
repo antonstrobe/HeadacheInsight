@@ -5,6 +5,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+const val AllDataAnalysisOwnerId: String = "all-data"
+
 @Serializable
 enum class EpisodeStatus { ACTIVE, COMPLETED, ARCHIVED }
 
@@ -282,8 +284,10 @@ data class AppSettings(
     val attachmentUploadConsent: Boolean = false,
     val locationConsent: Boolean = false,
     val comfortModeEnabled: Boolean = true,
+    val textScale: Float = 1.0f,
     val onboardingCompleted: Boolean = false,
     val handPreference: HandPreference = HandPreference.RIGHT,
+    val updateChecksEnabled: Boolean = true,
     val lastSeedVersion: String? = null,
 )
 

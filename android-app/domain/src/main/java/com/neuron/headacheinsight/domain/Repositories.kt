@@ -82,6 +82,8 @@ interface AttachmentRepository {
 
 interface AnalysisRepository {
     fun observeLatestAnalysis(ownerId: String): Flow<AnalysisSnapshot?>
+    fun observeAnalysisHistory(ownerId: String): Flow<List<AnalysisSnapshot>>
+    fun observeAllAnalysisHistory(): Flow<List<AnalysisSnapshot>>
     suspend fun previewEpisodeAnalysis(ownerId: String): Result<AnalysisRunPreview>
     suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse>
     suspend fun previewAllDataAnalysis(payloadJson: String, locale: String): Result<AnalysisRunPreview>

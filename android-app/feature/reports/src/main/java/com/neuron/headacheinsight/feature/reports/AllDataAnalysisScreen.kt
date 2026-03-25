@@ -32,8 +32,11 @@ import com.neuron.headacheinsight.core.designsystem.HeadacheInsightStatusColors
 import com.neuron.headacheinsight.core.designsystem.headacheInsightActionButtonColors
 import com.neuron.headacheinsight.core.designsystem.preferredHorizontalAlignment
 import com.neuron.headacheinsight.core.designsystem.preferredTextAlign
+import com.neuron.headacheinsight.core.model.AllDataAnalysisOwnerId
 import com.neuron.headacheinsight.core.model.AnalysisResponse
 import com.neuron.headacheinsight.core.model.AnalysisRunPreview
+import com.neuron.headacheinsight.core.model.AnalysisSnapshot
+import com.neuron.headacheinsight.core.ui.AnalysisSnapshotCard
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.domain.AnalysisRepository
 import com.neuron.headacheinsight.domain.BuildReportsUseCase
@@ -41,8 +44,10 @@ import com.neuron.headacheinsight.domain.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class AllDataAnalysisUiState(
@@ -60,6 +65,8 @@ class AllDataAnalysisViewModel @Inject constructor(
 ) : androidx.lifecycle.ViewModel() {
     private val _state = MutableStateFlow(AllDataAnalysisUiState())
     val state: StateFlow<AllDataAnalysisUiState> = _state
+    val history: StateFlow<List<AnalysisSnapshot>> = analysisRepository.observeAnalysisHistory(AllDataAnalysisOwnerId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun analyze() {
         if (_state.value.isAnalyzing) return
@@ -106,6 +113,7 @@ fun AllDataAnalysisRoute(
     viewModel: AllDataAnalysisViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         if (state.analysis == null && state.errorMessage == null) {
             viewModel.analyze()
@@ -113,6 +121,7 @@ fun AllDataAnalysisRoute(
     }
     AllDataAnalysisScreen(
         state = state,
+        history = history,
         onAnalyze = viewModel::analyze,
         onBack = onBack,
         onHome = onHome,
@@ -122,6 +131,7 @@ fun AllDataAnalysisRoute(
 @Composable
 fun AllDataAnalysisScreen(
     state: AllDataAnalysisUiState,
+    history: List<AnalysisSnapshot>,
     onAnalyze: () -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
@@ -304,6 +314,22 @@ fun AllDataAnalysisScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = preferredTextAlign(),
                             )
+                        }
+                    }
+                }
+            }
+
+            if (history.isNotEmpty()) {
+                HeadacheInsightSectionCard(
+                    title = stringResource(R.string.reports_all_analysis_history_title),
+                    supportingText = stringResource(R.string.reports_all_analysis_history_subtitle),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        history.forEach { snapshot ->
+                            AnalysisSnapshotCard(snapshot = snapshot)
                         }
                     }
                 }

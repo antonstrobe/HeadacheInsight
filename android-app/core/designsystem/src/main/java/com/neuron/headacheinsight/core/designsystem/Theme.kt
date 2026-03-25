@@ -13,6 +13,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 
 private val MidnightInk = Color(0xFF091320)
@@ -75,15 +78,15 @@ val HeadacheInsightLightScheme: ColorScheme = lightColorScheme(
     onError = Color.White,
 )
 
-val HeadacheInsightTypography = Typography(
-    headlineLarge = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold),
-    headlineMedium = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 21.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 21.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium),
+private val HeadacheInsightTypographyBase = Typography(
+    headlineLarge = TextStyle(fontSize = 29.sp, lineHeight = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.01).em),
+    headlineMedium = TextStyle(fontSize = 24.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.01).em),
+    headlineSmall = TextStyle(fontSize = 19.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
+    titleLarge = TextStyle(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 20.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
 )
 
 val HeadacheInsightShapes = Shapes(
@@ -95,12 +98,13 @@ val HeadacheInsightShapes = Shapes(
 @Composable
 fun HeadacheInsightTheme(
     comfortMode: Boolean = true,
+    textScale: Float = 1.0f,
     content: @Composable () -> Unit,
 ) {
     val dark = comfortMode || isSystemInDarkTheme()
     MaterialTheme(
         colorScheme = if (dark) HeadacheInsightDarkScheme else HeadacheInsightLightScheme,
-        typography = HeadacheInsightTypography,
+        typography = HeadacheInsightTypographyBase.scaled(textScale.coerceIn(0.85f, 1.35f)),
         shapes = HeadacheInsightShapes,
         content = content,
     )
@@ -122,3 +126,22 @@ object HeadacheInsightCardDefaults {
         containerColor = containerColor ?: MaterialTheme.colorScheme.surfaceVariant,
     )
 }
+
+private fun Typography.scaled(scale: Float): Typography = copy(
+    headlineLarge = headlineLarge.scaled(scale),
+    headlineMedium = headlineMedium.scaled(scale),
+    headlineSmall = headlineSmall.scaled(scale),
+    titleLarge = titleLarge.scaled(scale),
+    titleMedium = titleMedium.scaled(scale),
+    bodyLarge = bodyLarge.scaled(scale),
+    bodyMedium = bodyMedium.scaled(scale),
+    labelLarge = labelLarge.scaled(scale),
+)
+
+private fun TextStyle.scaled(scale: Float): TextStyle = copy(
+    fontSize = fontSize.scaled(scale),
+    lineHeight = lineHeight.scaled(scale),
+)
+
+private fun TextUnit.scaled(scale: Float): TextUnit =
+    if (isUnspecified) this else (value * scale).sp

@@ -15,6 +15,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,6 +46,7 @@ import com.neuron.headacheinsight.core.model.buildOpenAiModelCatalog
 import com.neuron.headacheinsight.core.model.isOpenAiAutoModel
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.SectionActionRow
+import com.neuron.headacheinsight.core.ui.ToggleSectionCard
 import com.neuron.headacheinsight.domain.BackendStatusRepository
 import com.neuron.headacheinsight.domain.CloudCredentialsRepository
 import com.neuron.headacheinsight.domain.OpenAiModelRepository
@@ -158,6 +160,8 @@ class SettingsViewModel @Inject constructor(
     fun save(
         languageTag: String,
         handPreference: HandPreference,
+        textScale: Float,
+        updateChecksEnabled: Boolean,
         apiKey: String,
         analysisModel: String,
         allDataAnalysisModel: String,
@@ -168,6 +172,8 @@ class SettingsViewModel @Inject constructor(
             persistSettings(
                 languageTag = languageTag,
                 handPreference = handPreference,
+                textScale = textScale,
+                updateChecksEnabled = updateChecksEnabled,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
                 allDataAnalysisModel = allDataAnalysisModel,
@@ -180,6 +186,8 @@ class SettingsViewModel @Inject constructor(
     fun saveAndTest(
         languageTag: String,
         handPreference: HandPreference,
+        textScale: Float,
+        updateChecksEnabled: Boolean,
         apiKey: String,
         analysisModel: String,
         allDataAnalysisModel: String,
@@ -190,6 +198,8 @@ class SettingsViewModel @Inject constructor(
             persistSettings(
                 languageTag = languageTag,
                 handPreference = handPreference,
+                textScale = textScale,
+                updateChecksEnabled = updateChecksEnabled,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
                 allDataAnalysisModel = allDataAnalysisModel,
@@ -256,6 +266,8 @@ class SettingsViewModel @Inject constructor(
     private suspend fun persistSettings(
         languageTag: String,
         handPreference: HandPreference,
+        textScale: Float,
+        updateChecksEnabled: Boolean,
         apiKey: String,
         analysisModel: String,
         allDataAnalysisModel: String,
@@ -278,6 +290,8 @@ class SettingsViewModel @Inject constructor(
                 languageTag = languageTag,
                 languageSelectionCompleted = true,
                 handPreference = handPreference,
+                textScale = textScale.coerceIn(0.85f, 1.35f),
+                updateChecksEnabled = updateChecksEnabled,
                 lastSeedVersion = if (it.languageTag == languageTag) it.lastSeedVersion else null,
             )
         }
@@ -304,8 +318,8 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onSave: (String, HandPreference, String, String, String, String, String) -> Unit,
-    onSaveAndTest: (String, HandPreference, String, String, String, String, String) -> Unit,
+    onSave: (String, HandPreference, Float, Boolean, String, String, String, String, String) -> Unit,
+    onSaveAndTest: (String, HandPreference, Float, Boolean, String, String, String, String, String) -> Unit,
     onRefreshAvailableModels: (String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
@@ -315,6 +329,8 @@ fun SettingsScreen(
 
     var languageState by remember(settings.languageTag) { mutableStateOf(settings.languageTag) }
     var handPreferenceState by remember(settings.handPreference) { mutableStateOf(settings.handPreference) }
+    var textScaleState by remember(settings.textScale) { mutableStateOf(settings.textScale.coerceIn(0.85f, 1.35f)) }
+    var updateChecksState by remember(settings.updateChecksEnabled) { mutableStateOf(settings.updateChecksEnabled) }
     var apiKeyState by remember(cloudCredentials.apiKey) { mutableStateOf(cloudCredentials.apiKey) }
     var analysisModelState by remember(cloudCredentials.analysisModel) { mutableStateOf(cloudCredentials.analysisModel) }
     var allDataAnalysisModelState by remember(cloudCredentials.allDataAnalysisModel) { mutableStateOf(cloudCredentials.allDataAnalysisModel) }
@@ -326,6 +342,8 @@ fun SettingsScreen(
         onSave(
             languageState,
             handPreferenceState,
+            textScaleState,
+            updateChecksState,
             apiKeyState,
             analysisModelState,
             allDataAnalysisModelState,
@@ -338,6 +356,8 @@ fun SettingsScreen(
         onSaveAndTest(
             languageState,
             handPreferenceState,
+            textScaleState,
+            updateChecksState,
             apiKeyState,
             analysisModelState,
             allDataAnalysisModelState,
@@ -441,6 +461,36 @@ fun SettingsScreen(
                 onModelSelected = { transcribeModelState = it },
             )
         }
+
+        HeadacheInsightSectionCard(
+            title = stringResource(R.string.settings_display_title),
+            supportingText = stringResource(R.string.settings_display_subtitle),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_text_scale_label),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = preferredTextAlign(),
+            )
+            Text(
+                text = stringResource(R.string.settings_text_scale_value, textScaleState * 100f),
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = preferredTextAlign(),
+            )
+            Slider(
+                value = textScaleState,
+                onValueChange = { textScaleState = it },
+                valueRange = 0.85f..1.35f,
+            )
+        }
+
+        ToggleSectionCard(
+            title = stringResource(R.string.settings_updates_title),
+            checked = updateChecksState,
+            onCheckedChange = { updateChecksState = it },
+            supportingText = stringResource(R.string.settings_updates_subtitle),
+        )
 
         HeadacheInsightSectionCard(
             title = stringResource(R.string.settings_language_title),

@@ -128,6 +128,9 @@ interface AnalysisDao {
     @Query("SELECT * FROM analysis_snapshot WHERE ownerId = :ownerId ORDER BY createdAtEpochMs DESC")
     fun observeByOwner(ownerId: String): Flow<List<AnalysisSnapshotEntity>>
 
+    @Query("SELECT * FROM analysis_snapshot ORDER BY createdAtEpochMs DESC")
+    fun observeAll(): Flow<List<AnalysisSnapshotEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: AnalysisSnapshotEntity)
 }
