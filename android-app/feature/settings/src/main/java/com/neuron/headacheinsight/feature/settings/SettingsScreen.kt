@@ -94,6 +94,7 @@ data class SettingsUiState(
     val connectionStatus: BackendConnectionStatus? = null,
     val connectionErrorMessage: String? = null,
     val analysisModels: List<String> = emptyList(),
+    val allDataAnalysisModels: List<String> = emptyList(),
     val questionModels: List<String> = emptyList(),
     val transcribeModels: List<String> = emptyList(),
     val supportedModelCount: Int = 0,
@@ -134,9 +135,11 @@ class SettingsViewModel @Inject constructor(
             connectionStatus = connection.status,
             connectionErrorMessage = connection.errorMessage,
             analysisModels = catalog.analysisModels,
+            allDataAnalysisModels = catalog.analysisModels,
             questionModels = catalog.questionModels,
             transcribeModels = catalog.transcribeModels,
             supportedModelCount = listOf(
+                catalog.analysisModels,
                 catalog.analysisModels,
                 catalog.questionModels,
                 catalog.transcribeModels,
@@ -157,6 +160,7 @@ class SettingsViewModel @Inject constructor(
         handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
+        allDataAnalysisModel: String,
         questionModel: String,
         transcribeModel: String,
     ) {
@@ -166,6 +170,7 @@ class SettingsViewModel @Inject constructor(
                 handPreference = handPreference,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
+                allDataAnalysisModel = allDataAnalysisModel,
                 questionModel = questionModel,
                 transcribeModel = transcribeModel,
             )
@@ -177,6 +182,7 @@ class SettingsViewModel @Inject constructor(
         handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
+        allDataAnalysisModel: String,
         questionModel: String,
         transcribeModel: String,
     ) {
@@ -186,6 +192,7 @@ class SettingsViewModel @Inject constructor(
                 handPreference = handPreference,
                 apiKey = apiKey,
                 analysisModel = analysisModel,
+                allDataAnalysisModel = allDataAnalysisModel,
                 questionModel = questionModel,
                 transcribeModel = transcribeModel,
             )
@@ -251,6 +258,7 @@ class SettingsViewModel @Inject constructor(
         handPreference: HandPreference,
         apiKey: String,
         analysisModel: String,
+        allDataAnalysisModel: String,
         questionModel: String,
         transcribeModel: String,
     ) {
@@ -259,6 +267,7 @@ class SettingsViewModel @Inject constructor(
             CloudCredentials(
                 apiKey = apiKey.trim(),
                 analysisModel = analysisModel.trim().ifBlank { defaults.analysisModel },
+                allDataAnalysisModel = allDataAnalysisModel.trim().ifBlank { defaults.allDataAnalysisModel },
                 questionModel = questionModel.trim().ifBlank { defaults.questionModel },
                 transcribeModel = transcribeModel.trim().ifBlank { defaults.transcribeModel },
             ),
@@ -295,8 +304,8 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    onSave: (String, HandPreference, String, String, String, String) -> Unit,
-    onSaveAndTest: (String, HandPreference, String, String, String, String) -> Unit,
+    onSave: (String, HandPreference, String, String, String, String, String) -> Unit,
+    onSaveAndTest: (String, HandPreference, String, String, String, String, String) -> Unit,
     onRefreshAvailableModels: (String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
@@ -308,6 +317,7 @@ fun SettingsScreen(
     var handPreferenceState by remember(settings.handPreference) { mutableStateOf(settings.handPreference) }
     var apiKeyState by remember(cloudCredentials.apiKey) { mutableStateOf(cloudCredentials.apiKey) }
     var analysisModelState by remember(cloudCredentials.analysisModel) { mutableStateOf(cloudCredentials.analysisModel) }
+    var allDataAnalysisModelState by remember(cloudCredentials.allDataAnalysisModel) { mutableStateOf(cloudCredentials.allDataAnalysisModel) }
     var questionModelState by remember(cloudCredentials.questionModel) { mutableStateOf(cloudCredentials.questionModel) }
     var transcribeModelState by remember(cloudCredentials.transcribeModel) { mutableStateOf(cloudCredentials.transcribeModel) }
     var showApiKey by remember { mutableStateOf(false) }
@@ -318,6 +328,7 @@ fun SettingsScreen(
             handPreferenceState,
             apiKeyState,
             analysisModelState,
+            allDataAnalysisModelState,
             questionModelState,
             transcribeModelState,
         )
@@ -329,6 +340,7 @@ fun SettingsScreen(
             handPreferenceState,
             apiKeyState,
             analysisModelState,
+            allDataAnalysisModelState,
             questionModelState,
             transcribeModelState,
         )
@@ -409,6 +421,12 @@ fun SettingsScreen(
                 selectedModel = analysisModelState,
                 availableModels = state.analysisModels,
                 onModelSelected = { analysisModelState = it },
+            )
+            ModelDropdownField(
+                label = stringResource(R.string.settings_all_data_analysis_model_label),
+                selectedModel = allDataAnalysisModelState,
+                availableModels = state.allDataAnalysisModels,
+                onModelSelected = { allDataAnalysisModelState = it },
             )
             ModelDropdownField(
                 label = stringResource(R.string.settings_question_model_label),
@@ -649,6 +667,7 @@ private fun ConnectionStatusBlock(
             text = stringResource(
                 R.string.settings_connection_models,
                 status.analysisModel,
+                status.allDataAnalysisModel,
                 status.questionModel,
                 status.transcribeModel,
             ),

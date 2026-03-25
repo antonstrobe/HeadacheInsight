@@ -59,8 +59,9 @@
     <string name="settings_connection_success">OpenAI ответил</string>
     <string name="settings_connection_error">Ошибка соединения</string>
     <string name="settings_connection_service">Сервис: %1$s</string>
-    <string name="settings_connection_models">Модели: %1$s / %2$s / %3$s</string>
+    <string name="settings_connection_models">Модели: %1$s / %2$s / %3$s / %4$s</string>
     <string name="settings_connection_key_present">OpenAI принял API-ключ.</string>
     <string name="settings_connection_key_missing">API-ключ не передан или пустой.</string>
     <string name="settings_connection_error_message">Последняя ошибка: %1$s</string>
+    <string name="settings_all_data_analysis_model_label">Модель для анализа всего</string>
 </resources>

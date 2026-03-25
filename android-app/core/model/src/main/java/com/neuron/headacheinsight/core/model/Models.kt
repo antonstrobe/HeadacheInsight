@@ -290,6 +290,7 @@ data class AppSettings(
 data class CloudCredentials(
     val apiKey: String = "",
     val analysisModel: String = OpenAiAutoModelId,
+    val allDataAnalysisModel: String = OpenAiAutoModelId,
     val questionModel: String = OpenAiAutoModelId,
     val transcribeModel: String = OpenAiAutoModelId,
 ) {
@@ -303,6 +304,7 @@ data class BackendConnectionStatus(
     @SerialName("service") val serviceName: String,
     @SerialName("api_key_present") val apiKeyPresent: Boolean,
     @SerialName("analysis_model") val analysisModel: String,
+    @SerialName("all_data_analysis_model") val allDataAnalysisModel: String,
     @SerialName("question_model") val questionModel: String,
     @SerialName("transcribe_model") val transcribeModel: String,
 )

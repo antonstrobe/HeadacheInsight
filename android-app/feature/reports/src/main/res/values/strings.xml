@@ -1,4 +1,18 @@
 <resources>
+    <string name="reports_all_analysis_title">Analyze all saved data</string>
+    <string name="reports_all_analysis_subtitle">This screen sends the full exported history to the selected model for a longitudinal review.</string>
+    <string name="reports_all_analysis_action">Analyze all data again</string>
+    <string name="reports_all_analysis_running">Analyzing all data...</string>
+    <string name="reports_all_analysis_tokens">Approximate input size: %1$d tokens</string>
+    <string name="reports_all_analysis_auto_model">Automatic model: %1$s</string>
+    <string name="reports_all_analysis_selected_model">Selected model: %1$s</string>
+    <string name="reports_all_analysis_recommendation">Recommendation: switch the analyze-all model to %1$s for a stronger longitudinal result.</string>
+    <string name="reports_all_analysis_error">Analysis error: %1$s</string>
+    <string name="reports_all_analysis_result_title">Longitudinal analysis</string>
+    <string name="reports_all_analysis_result_subtitle">The app looked across the stored history instead of a single episode.</string>
+    <string name="reports_all_analysis_hypotheses">Key hypotheses</string>
+    <string name="reports_all_analysis_doctor_points">Doctor discussion points</string>
+    <string name="reports_all_analysis_self_care">Self-care guidance</string>
     <string name="reports_patient_title">Patient report</string>
     <string name="reports_clinician_title">Clinician report</string>
     <string name="reports_loading">Loading...</string>

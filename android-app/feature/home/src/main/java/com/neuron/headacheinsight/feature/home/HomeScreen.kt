@@ -58,6 +58,7 @@ class HomeViewModel @Inject constructor(
 @Composable
 fun HomeRoute(
     onStartEpisode: () -> Unit,
+    onAnalyzeAll: () -> Unit,
     onContinueEpisode: (String) -> Unit,
     onHistory: () -> Unit,
     onProfile: () -> Unit,
@@ -72,6 +73,7 @@ fun HomeRoute(
     HomeScreen(
         state = state,
         onStartEpisode = onStartEpisode,
+        onAnalyzeAll = onAnalyzeAll,
         onContinueEpisode = onContinueEpisode,
         onHistory = onHistory,
         onProfile = onProfile,
@@ -87,6 +89,7 @@ fun HomeRoute(
 fun HomeScreen(
     state: com.neuron.headacheinsight.core.model.HomeDashboard,
     onStartEpisode: () -> Unit,
+    onAnalyzeAll: () -> Unit,
     onContinueEpisode: (String) -> Unit,
     onHistory: () -> Unit,
     onProfile: () -> Unit,
@@ -123,18 +126,37 @@ fun HomeScreen(
                     horizontalAlignment = preferredHorizontalAlignment(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Button(
-                        onClick = { state.pendingEpisode?.id?.let(onContinueEpisode) },
-                        enabled = state.pendingEpisode != null,
-                        colors = headacheInsightActionButtonColors(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.home_continue_episode),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Button(
+                            onClick = onAnalyzeAll,
+                            colors = headacheInsightActionButtonColors(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(64.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_analyze_all),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        Button(
+                            onClick = { state.pendingEpisode?.id?.let(onContinueEpisode) },
+                            enabled = state.pendingEpisode != null,
+                            colors = headacheInsightActionButtonColors(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(64.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_continue_episode),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                     HeadacheInsightPrimaryPainButton(
                         label = stringResource(R.string.home_pain_button),

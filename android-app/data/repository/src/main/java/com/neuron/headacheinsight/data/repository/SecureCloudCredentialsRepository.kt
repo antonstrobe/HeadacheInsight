@@ -36,6 +36,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
         prefs.edit()
             .putString(KEY_API_KEY, credentials.apiKey.takeIf { it.isNotBlank() }?.let(::encrypt))
             .putString(KEY_ANALYSIS_MODEL, credentials.analysisModel.takeIf { it.isNotBlank() }?.let(::encrypt))
+            .putString(KEY_ALL_DATA_ANALYSIS_MODEL, credentials.allDataAnalysisModel.takeIf { it.isNotBlank() }?.let(::encrypt))
             .putString(KEY_QUESTION_MODEL, credentials.questionModel.takeIf { it.isNotBlank() }?.let(::encrypt))
             .putString(KEY_TRANSCRIBE_MODEL, credentials.transcribeModel.takeIf { it.isNotBlank() }?.let(::encrypt))
             .apply()
@@ -45,6 +46,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
     private fun readCredentials(): CloudCredentials = CloudCredentials(
         apiKey = prefs.getString(KEY_API_KEY, null)?.let(::decryptOrNull).orEmpty(),
         analysisModel = prefs.getString(KEY_ANALYSIS_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_ANALYSIS_MODEL },
+        allDataAnalysisModel = prefs.getString(KEY_ALL_DATA_ANALYSIS_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_ALL_DATA_ANALYSIS_MODEL },
         questionModel = prefs.getString(KEY_QUESTION_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_QUESTION_MODEL },
         transcribeModel = prefs.getString(KEY_TRANSCRIBE_MODEL, null)?.let(::decryptOrNull).orEmpty().ifBlank { DEFAULT_TRANSCRIBE_MODEL },
     ).normalized()
@@ -89,6 +91,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
 
     private fun CloudCredentials.normalized(): CloudCredentials = copy(
         analysisModel = analysisModel.ifBlank { DEFAULT_ANALYSIS_MODEL },
+        allDataAnalysisModel = allDataAnalysisModel.ifBlank { DEFAULT_ALL_DATA_ANALYSIS_MODEL },
         questionModel = when (questionModel.ifBlank { DEFAULT_QUESTION_MODEL }) {
             LEGACY_QUESTION_MODEL -> DEFAULT_QUESTION_MODEL
             else -> questionModel.ifBlank { DEFAULT_QUESTION_MODEL }
@@ -101,6 +104,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
         const val KEY_ALIAS = "headacheinsight_cloud_secret"
         const val KEY_API_KEY = "openai_api_key"
         const val KEY_ANALYSIS_MODEL = "openai_analysis_model"
+        const val KEY_ALL_DATA_ANALYSIS_MODEL = "openai_all_data_analysis_model"
         const val KEY_QUESTION_MODEL = "openai_question_model"
         const val KEY_TRANSCRIBE_MODEL = "openai_transcribe_model"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -108,6 +112,7 @@ class KeystoreBackedCloudCredentialsRepository @Inject constructor(
         const val IV_SIZE = 12
         const val GCM_TAG_SIZE = 128
         const val DEFAULT_ANALYSIS_MODEL = OpenAiAutoModelId
+        const val DEFAULT_ALL_DATA_ANALYSIS_MODEL = OpenAiAutoModelId
         const val DEFAULT_QUESTION_MODEL = OpenAiAutoModelId
         const val DEFAULT_TRANSCRIBE_MODEL = OpenAiAutoModelId
         const val LEGACY_QUESTION_MODEL = "gpt-4.1-mini"

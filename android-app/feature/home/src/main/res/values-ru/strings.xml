@@ -18,4 +18,5 @@
     <string name="home_new_questions">Создать новые вопросы</string>
     <string name="home_settings">Настройки</string>
     <string name="home_sync_queue">Очередь синхронизации</string>
+    <string name="home_analyze_all">Проанализировать всё</string>
 </resources>

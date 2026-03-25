@@ -45,4 +45,7 @@
     <string name="questionnaire_clear_confirm_message">Вы точно хотите удалить ответ на этот вопрос?</string>
     <string name="questionnaire_clear_confirm_yes">Да, удалить</string>
     <string name="questionnaire_clear_confirm_cancel">Отмена</string>
+    <string name="questionnaire_ai_section_title">Уточняющие вопросы от ИИ</string>
+    <string name="questionnaire_ai_section_subtitle">Эти карточки пришли из последнего анализа. Они автоматически подняты наверх, чтобы можно было сразу ответить.</string>
+    <string name="questionnaire_ai_question_label">Вопрос от ИИ</string>
 </resources>

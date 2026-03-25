@@ -27,6 +27,7 @@
     <string name="settings_models_auto">Automatically determine</string>
     <string name="settings_models_auto_note">Automatic mode is listed first and is the recommended default. Analysis prefers the strongest suitable GPT-5 model, while transcription keeps dedicated speech models only.</string>
     <string name="settings_analysis_model_label">Analysis model</string>
+    <string name="settings_all_data_analysis_model_label">Analyze-all model</string>
     <string name="settings_question_model_label">Follow-up model</string>
     <string name="settings_transcribe_model_label">Speech-to-text model</string>
     <string name="settings_local_speech_title">Offline speech model</string>
@@ -59,7 +60,7 @@
     <string name="settings_connection_success">OpenAI responded</string>
     <string name="settings_connection_error">Connection error</string>
     <string name="settings_connection_service">Service: %1$s</string>
-    <string name="settings_connection_models">Models: %1$s / %2$s / %3$s</string>
+    <string name="settings_connection_models">Models: %1$s / %2$s / %3$s / %4$s</string>
     <string name="settings_connection_key_present">API key accepted by OpenAI.</string>
     <string name="settings_connection_key_missing">API key is missing or empty.</string>
     <string name="settings_connection_error_message">Last error: %1$s</string>

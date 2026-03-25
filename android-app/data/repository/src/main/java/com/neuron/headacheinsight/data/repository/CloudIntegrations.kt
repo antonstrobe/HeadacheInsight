@@ -219,6 +219,47 @@ class DefaultAnalysisRepository @Inject constructor(
         response
     }
 
+    override suspend fun previewAllDataAnalysis(
+        payloadJson: String,
+        locale: String,
+    ): Result<AnalysisRunPreview> = runCatching {
+        val prepared = prepareAllDataAnalysis(
+            payloadJson = payloadJson,
+            locale = locale,
+        )
+        openAiRuntimeModelResolver.previewAnalysis(
+            configuredModel = prepared.configuredModel,
+            estimatedInputTokens = prepared.estimatedInputTokens,
+        )
+    }
+
+    override suspend fun analyzeAllData(
+        payloadJson: String,
+        locale: String,
+    ): Result<AnalysisResponse> = runCatching {
+        val prepared = prepareAllDataAnalysis(
+            payloadJson = payloadJson,
+            locale = locale,
+        )
+        val now = timeProvider.now()
+        backendApi.completeJson<OpenAiAnalysisDraft>(
+            model = prepared.effectiveModel,
+            systemPrompt = prepared.systemPrompt,
+            userPayload = prepared.userPayload,
+            json = json,
+            schemaName = "headache_all_data_analysis",
+            schema = HeadacheAnalysisSchema,
+            reasoningEffort = prepared.reasoningEffort,
+            temperature = prepared.temperature,
+        ).toAnalysisResponse(
+            ownerId = "all-data",
+            generatedAt = now.toString(),
+            createdAt = now,
+            locale = prepared.locale,
+            ownerType = OwnerType.PROFILE,
+        )
+    }
+
     override suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>> = runCatching {
         val episodeDetail = requireNotNull(episodeRepository.observeEpisodeDetail(ownerId).first()) { "Episode not found" }
         val credentials = requireCloudCredentials()
@@ -332,6 +373,30 @@ class DefaultAnalysisRepository @Inject constructor(
         )
     }
 
+    private suspend fun prepareAllDataAnalysis(
+        payloadJson: String,
+        locale: String,
+    ): PreparedAnalysisRequest {
+        val credentials = requireCloudCredentials()
+        val systemPrompt = buildAllDataAnalysisSystemPrompt(locale)
+        val estimatedInputTokens = estimateOpenAiTokens(systemPrompt, payloadJson)
+        val effectiveModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.allDataAnalysisModel,
+            task = OpenAiModelTask.ANALYSIS,
+            estimatedInputTokens = estimatedInputTokens,
+        )
+        return PreparedAnalysisRequest(
+            locale = locale,
+            configuredModel = credentials.allDataAnalysisModel,
+            effectiveModel = effectiveModel,
+            systemPrompt = systemPrompt,
+            userPayload = payloadJson,
+            estimatedInputTokens = estimatedInputTokens,
+            reasoningEffort = effectiveModel.reasoningEffortFor(OpenAiModelTask.ANALYSIS),
+            temperature = effectiveModel.temperatureFor(OpenAiModelTask.ANALYSIS),
+        )
+    }
+
     private suspend fun persistAnalysis(
         ownerId: String,
         response: AnalysisResponse,
@@ -374,6 +439,10 @@ class DefaultBackendStatusRepository @Inject constructor(
             configuredModel = credentials.analysisModel,
             task = OpenAiModelTask.ANALYSIS,
         )
+        val allDataAnalysisModel = openAiRuntimeModelResolver.resolveModel(
+            configuredModel = credentials.allDataAnalysisModel,
+            task = OpenAiModelTask.ANALYSIS,
+        )
         val questionModel = openAiRuntimeModelResolver.resolveModel(
             configuredModel = credentials.questionModel,
             task = OpenAiModelTask.QUESTIONS,
@@ -386,6 +455,7 @@ class DefaultBackendStatusRepository @Inject constructor(
             serviceName = "OpenAI API",
             apiKeyPresent = true,
             analysisModel = analysisModel,
+            allDataAnalysisModel = allDataAnalysisModel,
             questionModel = questionModel,
             transcribeModel = transcribeModel,
         )
@@ -848,9 +918,23 @@ Use the input locale when writing human-readable text.
 Keep the result clinically careful, concise, and non-diagnostic.
 Allowed urgent_action.level values: NONE, MONITOR, DISCUSS_SOON, URGENT, EMERGENCY.
 Allowed hypothesis confidence values: LOW, MEDIUM, HIGH.
+Treat custom additional_context answer objects as direct patient notes that may refine the episode.
 For next_questions, use snake_case keys and uppercase enum strings for stage and answer_type.
 Only include next_questions when they are genuinely useful. Otherwise return an empty array.
 Prefer small focused question lists.
+""".trimIndent()
+
+private fun buildAllDataAnalysisSystemPrompt(locale: String): String = """
+You analyze longitudinal headache diary data across many episodes.
+Return exactly one JSON object that matches the provided schema.
+Use the input locale when writing human-readable text.
+Focus on patterns, changes over time, possible triggers, functional impact, and what should be clarified next.
+Keep the result clinically careful, concise, and non-diagnostic.
+The input payload is a full exported history snapshot for this patient.
+Allowed urgent_action.level values: NONE, MONITOR, DISCUSS_SOON, URGENT, EMERGENCY.
+Allowed hypothesis confidence values: LOW, MEDIUM, HIGH.
+For next_questions, prefer an empty array unless one or two longitudinal follow-up questions would materially improve the analysis.
+Do not generate acute triage questions unless the data strongly supports that need.
 """.trimIndent()
 
 private fun buildFollowUpQuestionSystemPrompt(locale: String): String = """
@@ -1121,6 +1205,7 @@ private fun OpenAiAnalysisDraft.toAnalysisResponse(
     generatedAt: String,
     createdAt: kotlinx.datetime.Instant,
     locale: String,
+    ownerType: OwnerType = OwnerType.EPISODE,
 ): AnalysisResponse {
     val questions = nextQuestions.mapNotNull { draft ->
         draft.toQuestionTemplateOrNull(locale = locale, createdAt = createdAt)
@@ -1130,7 +1215,7 @@ private fun OpenAiAnalysisDraft.toAnalysisResponse(
     return AnalysisResponse(
         schemaVersion = "v1",
         analysisId = UUID.randomUUID().toString(),
-        ownerType = OwnerType.EPISODE,
+        ownerType = ownerType,
         ownerId = ownerId,
         generatedAt = generatedAt,
         urgentAction = UrgentAction(

@@ -116,5 +116,9 @@ object HeadacheInsightStatusColors {
 
 object HeadacheInsightCardDefaults {
     @Composable
-    fun elevated() = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    fun elevated(
+        containerColor: Color? = null,
+    ) = CardDefaults.elevatedCardColors(
+        containerColor = containerColor ?: MaterialTheme.colorScheme.surfaceVariant,
+    )
 }

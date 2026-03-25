@@ -84,6 +84,8 @@ interface AnalysisRepository {
     fun observeLatestAnalysis(ownerId: String): Flow<AnalysisSnapshot?>
     suspend fun previewEpisodeAnalysis(ownerId: String): Result<AnalysisRunPreview>
     suspend fun analyzeEpisode(ownerId: String): Result<AnalysisResponse>
+    suspend fun previewAllDataAnalysis(payloadJson: String, locale: String): Result<AnalysisRunPreview>
+    suspend fun analyzeAllData(payloadJson: String, locale: String): Result<AnalysisResponse>
     suspend fun generateFollowUpQuestions(ownerId: String): Result<List<QuestionTemplate>>
     suspend fun analyzeAttachments(ownerId: String): Result<List<String>>
 }

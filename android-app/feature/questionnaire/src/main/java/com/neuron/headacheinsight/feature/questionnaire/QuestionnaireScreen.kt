@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,6 +82,7 @@ import com.neuron.headacheinsight.core.model.AnalysisRunPreview
 import com.neuron.headacheinsight.core.model.AnswerType
 import com.neuron.headacheinsight.core.model.EpisodeDetail
 import com.neuron.headacheinsight.core.model.HandPreference
+import com.neuron.headacheinsight.core.model.QuestionSource
 import com.neuron.headacheinsight.core.model.QuestionTemplate
 import com.neuron.headacheinsight.core.ui.BottomMenuActions
 import com.neuron.headacheinsight.core.ui.EmptyState
@@ -106,11 +108,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 private data class QuestionnaireViewDraft(
     val isAnalyzing: Boolean = false,
@@ -128,6 +133,8 @@ data class QuestionnaireUiState(
     val generatedQuestionCount: Int? = null,
     val analysisPreview: AnalysisRunPreview? = null,
 )
+
+private const val AdditionalInfoQuestionTemplateId = "questionnaire_additional_info_entry"
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -192,6 +199,23 @@ class QuestionnaireViewModel @Inject constructor(
         }
     }
 
+    fun saveAdditionalInfo(payload: JsonElement) {
+        val trimmedPayload = payload.toString().trim()
+        if (payload == JsonNull || trimmedPayload.isBlank() || trimmedPayload == "\"\"") return
+        viewModelScope.launch {
+            saveQuestionAnswerUseCase(
+                episodeId = episodeId,
+                profileId = null,
+                questionId = "additional_context_${System.currentTimeMillis()}",
+                payload = buildJsonObject {
+                    put("entry_type", "additional_context")
+                    put("prompt", "Additional user-provided context")
+                    put("content", payload)
+                },
+            )
+        }
+    }
+
     fun analyzeEpisode() {
         viewModelScope.launch {
             draft.emit(draft.value.copy(isAnalyzing = true, analysisError = null))
@@ -236,6 +260,7 @@ fun QuestionnaireRoute(
     QuestionnaireScreen(
         state = state,
         onSaveAnswer = viewModel::saveAnswer,
+        onSaveAdditionalInfo = viewModel::saveAdditionalInfo,
         onAnalyze = viewModel::analyzeEpisode,
         onBack = onBack,
         onHome = onHome,
@@ -246,6 +271,7 @@ fun QuestionnaireRoute(
 fun QuestionnaireScreen(
     state: QuestionnaireUiState,
     onSaveAnswer: (String, JsonElement) -> Unit,
+    onSaveAdditionalInfo: (JsonElement) -> Unit,
     onAnalyze: () -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
@@ -255,6 +281,42 @@ fun QuestionnaireScreen(
         ?: Locale.getDefault().toLanguageTag()
     var activeVoiceQuestionId by remember(state.episodeDetail?.episode?.id) { mutableStateOf<String?>(null) }
     val voiceOwnerId = state.episodeDetail?.episode?.id ?: "questionnaire"
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val aiQuestions = remember(state.questions) {
+        state.questions
+            .filter { it.source == QuestionSource.API }
+            .sortedByDescending { it.priority }
+    }
+    val regularQuestions = remember(state.questions) {
+        state.questions.filterNot { it.source == QuestionSource.API }
+    }
+    val aiQuestionSignature = remember(aiQuestions) {
+        aiQuestions.joinToString(separator = "|") { it.id }
+    }
+    var lastAiQuestionSignature by remember(state.episodeDetail?.episode?.id) { mutableStateOf(aiQuestionSignature) }
+
+    fun aiSectionIndex(): Int {
+        var index = 1
+        if (state.episodeDetail != null) index += 1
+        if (state.latestAnalysis != null) index += 1
+        if (state.episodeDetail != null) index += 1
+        return index
+    }
+
+    fun scrollToAiQuestions() {
+        if (aiQuestions.isEmpty()) return
+        scope.launch {
+            listState.animateScrollToItem(aiSectionIndex())
+        }
+    }
+
+    LaunchedEffect(aiQuestionSignature) {
+        if (aiQuestionSignature.isNotBlank() && aiQuestionSignature != lastAiQuestionSignature) {
+            listState.animateScrollToItem(aiSectionIndex())
+        }
+        lastAiQuestionSignature = aiQuestionSignature
+    }
 
     androidx.compose.material3.Scaffold(
         bottomBar = {
@@ -300,6 +362,7 @@ fun QuestionnaireScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(20.dp),
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
@@ -308,10 +371,11 @@ fun QuestionnaireScreen(
                     supportingText = stringResource(R.string.questionnaire_subtitle),
                 ) {
                     Text(stringResource(R.string.questionnaire_answer_help))
-                    state.generatedQuestionCount?.let {
+                    (state.generatedQuestionCount ?: aiQuestions.size.takeIf { it > 0 })?.let {
                         HeadacheInsightStatusBadge(
                             label = stringResource(R.string.questionnaire_generated_count, it),
                             color = HeadacheInsightStatusColors.CloudAnalyzed,
+                            onClick = ::scrollToAiQuestions,
                         )
                     }
                     state.analysisPreview?.let { preview ->
@@ -384,7 +448,46 @@ fun QuestionnaireScreen(
 
             state.latestAnalysis?.let { analysis ->
                 item {
-                    AnalysisSummaryCard(analysis = analysis)
+                    AnalysisSummaryCard(
+                        analysis = analysis,
+                        onOpenNextQuestions = if (aiQuestions.isNotEmpty()) ::scrollToAiQuestions else null,
+                    )
+                }
+            }
+
+            state.episodeDetail?.let { detail ->
+                item {
+                    QuestionEditorCard(
+                        question = buildAdditionalInfoQuestionTemplate(
+                            locale = voiceLanguageTag,
+                            createdAt = detail.episode.updatedAt.takeIf { it.toEpochMilliseconds() > 0 }
+                                ?: Clock.System.now(),
+                        ),
+                        voiceOwnerId = voiceOwnerId,
+                        activeVoiceQuestionId = activeVoiceQuestionId,
+                        onActiveVoiceQuestionChanged = { activeVoiceQuestionId = it },
+                        voiceLanguageTag = voiceLanguageTag,
+                        onSaveAnswer = { _, payload -> onSaveAdditionalInfo(payload) },
+                        clearAfterSave = true,
+                        requireContentForSave = true,
+                    )
+                }
+            }
+
+            if (aiQuestions.isNotEmpty()) {
+                item {
+                    HeadacheInsightSectionCard(
+                        title = stringResource(R.string.questionnaire_ai_section_title),
+                        supportingText = stringResource(R.string.questionnaire_ai_section_subtitle),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        borderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.32f),
+                        accentColor = MaterialTheme.colorScheme.secondary,
+                    ) {
+                        HeadacheInsightStatusBadge(
+                            label = stringResource(R.string.questionnaire_analysis_next_questions, aiQuestions.size),
+                            color = HeadacheInsightStatusColors.CloudAnalyzed,
+                        )
+                    }
                 }
             }
 
@@ -397,7 +500,18 @@ fun QuestionnaireScreen(
                 }
             }
 
-            items(state.questions, key = { it.id }) { question ->
+            items(aiQuestions, key = { it.id }) { question ->
+                QuestionEditorCard(
+                    question = question,
+                    voiceOwnerId = voiceOwnerId,
+                    activeVoiceQuestionId = activeVoiceQuestionId,
+                    onActiveVoiceQuestionChanged = { activeVoiceQuestionId = it },
+                    voiceLanguageTag = voiceLanguageTag,
+                    onSaveAnswer = onSaveAnswer,
+                )
+            }
+
+            items(regularQuestions, key = { it.id }) { question ->
                 QuestionEditorCard(
                     question = question,
                     voiceOwnerId = voiceOwnerId,
@@ -411,9 +525,48 @@ fun QuestionnaireScreen(
     }
 }
 
+private fun buildAdditionalInfoQuestionTemplate(
+    locale: String,
+    createdAt: kotlinx.datetime.Instant,
+): QuestionTemplate = QuestionTemplate(
+    id = AdditionalInfoQuestionTemplateId,
+    schemaVersion = "local:additional-info",
+    source = QuestionSource.MANUAL,
+    category = "additional_context",
+    stage = com.neuron.headacheinsight.core.model.QuestionStage.ACUTE_DETAIL,
+    prompt = if (locale.startsWith("ru", ignoreCase = true)) {
+        "Можно дописать вручную или продиктовать новые детали перед следующим анализом."
+    } else {
+        "Add or dictate extra details before the next analysis run."
+    },
+    shortLabel = if (locale.startsWith("ru", ignoreCase = true)) {
+        "Внести дополнительную информацию"
+    } else {
+        "Add more information"
+    },
+    helpText = if (locale.startsWith("ru", ignoreCase = true)) {
+        "Например: физическая нагрузка, еда, сон, стресс, падение, прогулка или любые новые ощущения."
+    } else {
+        "For example: exercise, food, sleep, stress, a fall, a walk, or any new symptoms."
+    },
+    answerType = AnswerType.FREE_TEXT,
+    options = emptyList(),
+    priority = 100,
+    required = false,
+    skippable = true,
+    voiceAllowed = true,
+    visibleIf = null,
+    exportToClinician = true,
+    redFlagWeight = 0,
+    aiEligible = true,
+    createdAt = createdAt,
+    active = true,
+)
+
 @Composable
 private fun AnalysisSummaryCard(
     analysis: AnalysisResponse,
+    onOpenNextQuestions: (() -> Unit)? = null,
 ) {
     HeadacheInsightSectionCard(
         title = stringResource(R.string.questionnaire_analysis_title),
@@ -451,6 +604,7 @@ private fun AnalysisSummaryCard(
             HeadacheInsightStatusBadge(
                 label = stringResource(R.string.questionnaire_analysis_next_questions, analysis.nextQuestions.size),
                 color = HeadacheInsightStatusColors.CloudAnalyzed,
+                onClick = onOpenNextQuestions,
             )
         }
     }
@@ -464,6 +618,8 @@ private fun QuestionEditorCard(
     onActiveVoiceQuestionChanged: (String?) -> Unit,
     voiceLanguageTag: String,
     onSaveAnswer: (String, JsonElement) -> Unit,
+    clearAfterSave: Boolean = false,
+    requireContentForSave: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -514,6 +670,22 @@ private fun QuestionEditorCard(
     val clearConfirmCancel = stringResource(R.string.questionnaire_clear_confirm_cancel)
     val optionLabels = remember(question.options, voiceLanguageTag) {
         question.options.associateWith { option -> localizedQuestionOptionLabel(option, voiceLanguageTag) }
+    }
+    val isAiGenerated = question.source == QuestionSource.API
+    val cardContainerColor = if (isAiGenerated) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        null
+    }
+    val cardBorderColor = if (isAiGenerated) {
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.32f)
+    } else {
+        null
+    }
+    val cardAccentColor = if (isAiGenerated) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        null
     }
     val hasPrimaryTextInput = when (question.answerType) {
         AnswerType.NUMBER,
@@ -717,16 +889,30 @@ private fun QuestionEditorCard(
         }
     }
 
-    val canSave = when (question.answerType) {
-        AnswerType.BOOLEAN -> booleanValue != null || !question.required
-        AnswerType.SINGLE_SELECT -> {
-            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else singleValue != null || !question.required
+    val canSave = if (requireContentForSave) {
+        when (question.answerType) {
+            AnswerType.BOOLEAN -> booleanValue != null
+            AnswerType.SINGLE_SELECT -> {
+                if (question.options.isEmpty()) textValue.isNotBlank() else singleValue != null
+            }
+            AnswerType.MULTI_SELECT -> {
+                if (question.options.isEmpty()) textValue.isNotBlank() else multiValue.isNotEmpty()
+            }
+            AnswerType.SCALE -> true
+            else -> textValue.isNotBlank()
         }
-        AnswerType.MULTI_SELECT -> {
-            if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else multiValue.isNotEmpty() || !question.required
+    } else {
+        when (question.answerType) {
+            AnswerType.BOOLEAN -> booleanValue != null || !question.required
+            AnswerType.SINGLE_SELECT -> {
+                if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else singleValue != null || !question.required
+            }
+            AnswerType.MULTI_SELECT -> {
+                if (question.options.isEmpty()) textValue.isNotBlank() || !question.required else multiValue.isNotEmpty() || !question.required
+            }
+            AnswerType.SCALE -> true
+            else -> textValue.isNotBlank() || !question.required
         }
-        AnswerType.SCALE -> true
-        else -> textValue.isNotBlank() || !question.required
     }
 
     fun saveCurrentAnswer() {
@@ -751,6 +937,28 @@ private fun QuestionEditorCard(
             else -> JsonPrimitive(textValue.trim())
         }
         onSaveAnswer(question.id, payload)
+        if (clearAfterSave) {
+            cancelVoicePreviewJob()
+            voiceStopRequested = true
+            voiceSessionActive = false
+            voiceListening = false
+            voiceReconnectAttempts = 0
+            voiceLiveSegment = ""
+            destroyVoiceRecognizer()
+            scope.launch {
+                audioRecorder.stop()
+            }
+            onActiveVoiceQuestionChanged(null)
+            textValue = ""
+            booleanValue = null
+            singleValue = null
+            multiValue.clear()
+            scaleValue = 5f
+            voiceError = null
+            voiceLiveSegment = ""
+            voiceAudioPath = null
+            voiceSegments.clear()
+        }
     }
 
     suspend fun transcribeQuietVoicePreview(audioPath: String) {
@@ -918,6 +1126,9 @@ private fun QuestionEditorCard(
     HeadacheInsightSectionCard(
         title = question.shortLabel,
         supportingText = question.prompt,
+        containerColor = cardContainerColor,
+        borderColor = cardBorderColor,
+        accentColor = cardAccentColor,
     ) {
         SectionActionRow {
             TextButton(
@@ -932,6 +1143,12 @@ private fun QuestionEditorCard(
             horizontalArrangement = preferredSpacedArrangement(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (isAiGenerated) {
+                HeadacheInsightStatusBadge(
+                    label = stringResource(R.string.questionnaire_ai_question_label),
+                    color = HeadacheInsightStatusColors.CloudAnalyzed,
+                )
+            }
             HeadacheInsightStatusBadge(
                 label = if (question.required) {
                     stringResource(R.string.questionnaire_required)

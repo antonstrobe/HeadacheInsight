@@ -34,12 +34,18 @@ fun HeadacheInsightSectionCard(
     title: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    containerColor: Color? = null,
+    borderColor: Color? = null,
+    accentColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
+    val resolvedContainerColor = containerColor ?: MaterialTheme.colorScheme.surfaceVariant
+    val resolvedBorderColor = borderColor ?: MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+    val resolvedAccentColor = accentColor ?: MaterialTheme.colorScheme.primary
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = HeadacheInsightCardDefaults.elevated(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        colors = HeadacheInsightCardDefaults.elevated(containerColor = resolvedContainerColor),
+        border = BorderStroke(1.dp, resolvedBorderColor),
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -49,7 +55,7 @@ fun HeadacheInsightSectionCard(
             Box(
                 modifier = Modifier
                     .size(width = 44.dp, height = 4.dp)
-                    .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                    .background(resolvedAccentColor, MaterialTheme.shapes.small)
                     .align(preferredHorizontalAlignment()),
             )
             Text(
@@ -77,9 +83,10 @@ fun HeadacheInsightStatusBadge(
     label: String,
     color: Color,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     AssistChip(
-        onClick = { },
+        onClick = { onClick?.invoke() },
         modifier = modifier,
         label = { Text(label) },
         leadingIcon = {

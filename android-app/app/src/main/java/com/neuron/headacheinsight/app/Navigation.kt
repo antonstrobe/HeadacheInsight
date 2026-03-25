@@ -26,6 +26,7 @@ import com.neuron.headacheinsight.feature.onboarding.OnboardingRoute
 import com.neuron.headacheinsight.feature.profile.ProfileRoute
 import com.neuron.headacheinsight.feature.questionnaire.QuestionnaireRoute
 import com.neuron.headacheinsight.feature.quicklog.QuickLogRoute
+import com.neuron.headacheinsight.feature.reports.AllDataAnalysisRoute
 import com.neuron.headacheinsight.feature.reports.ReportsRoute
 import com.neuron.headacheinsight.feature.settings.SettingsRoute
 import com.neuron.headacheinsight.feature.sync.SyncRoute
@@ -38,6 +39,7 @@ sealed class HeadacheInsightDestination(val route: String) {
     data object Profile : HeadacheInsightDestination("profile")
     data object Attachments : HeadacheInsightDestination("attachments")
     data object Reports : HeadacheInsightDestination("reports")
+    data object AllAnalysis : HeadacheInsightDestination("all-analysis")
     data object Settings : HeadacheInsightDestination("settings")
     data object Sync : HeadacheInsightDestination("sync")
     data object Insights : HeadacheInsightDestination("insights")
@@ -130,6 +132,7 @@ fun HeadacheInsightNavHost(
             composable(HeadacheInsightDestination.Home.route) {
                 HomeRoute(
                     onStartEpisode = { navController.navigate(HeadacheInsightDestination.QuickLog.route) },
+                    onAnalyzeAll = { navController.navigate(HeadacheInsightDestination.AllAnalysis.route) },
                     onContinueEpisode = { navController.navigate(HeadacheInsightDestination.Questionnaire.create(it)) },
                     onHistory = { navController.navigate(HeadacheInsightDestination.Insights.route) },
                     onProfile = { navController.navigate(HeadacheInsightDestination.Profile.route) },
@@ -187,6 +190,12 @@ fun HeadacheInsightNavHost(
             }
             composable(HeadacheInsightDestination.Reports.route) {
                 ReportsRoute(
+                    onBack = { navController.popBackStack() },
+                    onHome = ::navigateHome,
+                )
+            }
+            composable(HeadacheInsightDestination.AllAnalysis.route) {
+                AllDataAnalysisRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )

@@ -3,4 +3,18 @@
     <string name="reports_clinician_title">Отчёт для врача</string>
     <string name="reports_loading">Загрузка...</string>
     <string name="reports_export">Экспорт PDF / CSV / JSON</string>
+    <string name="reports_all_analysis_title">Проанализировать все сохранённые данные</string>
+    <string name="reports_all_analysis_subtitle">Этот экран отправляет всю экспортированную историю в выбранную модель для продольного анализа.</string>
+    <string name="reports_all_analysis_action">Проанализировать всё ещё раз</string>
+    <string name="reports_all_analysis_running">Идёт полный анализ...</string>
+    <string name="reports_all_analysis_tokens">Примерный объём входа: %1$d токенов</string>
+    <string name="reports_all_analysis_auto_model">Автоматически выбрана модель: %1$s</string>
+    <string name="reports_all_analysis_selected_model">Выбранная модель: %1$s</string>
+    <string name="reports_all_analysis_recommendation">Рекомендация: для такого объёма лучше переключить полный анализ на %1$s.</string>
+    <string name="reports_all_analysis_error">Ошибка анализа: %1$s</string>
+    <string name="reports_all_analysis_result_title">Продольный анализ</string>
+    <string name="reports_all_analysis_result_subtitle">Здесь учитывается вся сохранённая история, а не один эпизод.</string>
+    <string name="reports_all_analysis_hypotheses">Ключевые гипотезы</string>
+    <string name="reports_all_analysis_doctor_points">Что обсудить с врачом</string>
+    <string name="reports_all_analysis_self_care">Подсказки по самопомощи</string>
 </resources>

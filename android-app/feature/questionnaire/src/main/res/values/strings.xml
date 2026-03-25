@@ -19,6 +19,9 @@
     <string name="questionnaire_analysis_title">Latest analysis</string>
     <string name="questionnaire_analysis_subtitle">The structured summary and follow-up suggestions from the current episode.</string>
     <string name="questionnaire_analysis_next_questions">%1$d suggested next questions</string>
+    <string name="questionnaire_ai_section_title">AI follow-up questions</string>
+    <string name="questionnaire_ai_section_subtitle">These cards came from the latest analysis. They are moved to the top so you can answer them immediately.</string>
+    <string name="questionnaire_ai_question_label">AI follow-up</string>
     <string name="questionnaire_required">Required</string>
     <string name="questionnaire_optional">Optional</string>
     <string name="questionnaire_yes">Yes</string>
