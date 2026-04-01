@@ -139,14 +139,14 @@ function Publish-ReleaseAssets([string]$GhPath, [string]$OwnerName, [string]$Tar
         Write-Host " - $asset"
     }
 
-    $tag = Read-Host "Тег релиза (Enter = v0.1.0-mvp-preview)"
+    $tag = Read-Host "Тег релиза (Enter = v0.1.1-mvp-preview)"
     if ([string]::IsNullOrWhiteSpace($tag)) {
-        $tag = "v0.1.0-mvp-preview"
+        $tag = "v0.1.1-mvp-preview"
     }
 
-    $title = Read-Host "Заголовок релиза (Enter = HeadacheInsight MVP Preview)"
+    $title = Read-Host "Заголовок релиза (Enter = HeadacheInsight MVP Preview 0.1.1)"
     if ([string]::IsNullOrWhiteSpace($title)) {
-        $title = "HeadacheInsight MVP Preview"
+        $title = "HeadacheInsight MVP Preview 0.1.1"
     }
 
     $notes = @"

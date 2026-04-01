@@ -100,6 +100,7 @@ fun HeadacheInsightStatusBadge(
             containerColor = color.copy(alpha = 0.16f),
             labelColor = MaterialTheme.colorScheme.onSurface,
         ),
+        interactionSource = null,
     )
 }
 

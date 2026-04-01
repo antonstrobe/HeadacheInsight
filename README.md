@@ -1,7 +1,7 @@
 # HeadacheInsight
 
 <p align="center">
-  <a href="https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.0-mvp-preview/app-prod-debug.apk">
+  <a href="https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.1-mvp-preview/app-prod-debug.apk">
     <img src="https://img.shields.io/badge/Download-APK%20Preview-2ea043?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Preview" />
   </a>
   <a href="./quick-start-windows-admin.bat">
@@ -84,9 +84,9 @@ HeadacheInsight — Android-приложение с открытым исход�
 ### Скачать APK
 
 - APK preview:
-  `https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.0-mvp-preview/app-prod-debug.apk`
+  `https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.1-mvp-preview/app-prod-debug.apk`
 - Страница релиза:
-  `https://github.com/AntonStrobe/HeadacheInsight/releases/tag/v0.1.0-mvp-preview`
+  `https://github.com/AntonStrobe/HeadacheInsight/releases/tag/v0.1.1-mvp-preview`
 
 ### Быстрый старт
 
@@ -204,9 +204,9 @@ Design details:
 ### Download APK
 
 - APK preview:
-  `https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.0-mvp-preview/app-prod-debug.apk`
+  `https://github.com/AntonStrobe/HeadacheInsight/releases/download/v0.1.1-mvp-preview/app-prod-debug.apk`
 - Release page:
-  `https://github.com/AntonStrobe/HeadacheInsight/releases/tag/v0.1.0-mvp-preview`
+  `https://github.com/AntonStrobe/HeadacheInsight/releases/tag/v0.1.1-mvp-preview`
 
 ### Quick Start
 

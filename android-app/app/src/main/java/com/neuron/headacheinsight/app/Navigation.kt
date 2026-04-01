@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -100,7 +101,7 @@ fun HeadacheInsightNavHost(
             navController = navController,
             startDestination = resolveStartRoute(),
         ) {
-            composable(HeadacheInsightDestination.Language.route) {
+            composable(HeadacheInsightDestination.Language.route) { _: NavBackStackEntry ->
                 LanguageSelectionScreen(
                     onSelectRussian = {
                         AppCompatDelegate.setApplicationLocales(
@@ -120,7 +121,7 @@ fun HeadacheInsightNavHost(
                     },
                 )
             }
-            composable(HeadacheInsightDestination.Onboarding.route) {
+            composable(HeadacheInsightDestination.Onboarding.route) { _: NavBackStackEntry ->
                 OnboardingRoute(
                     onComplete = {
                         navController.navigate(HeadacheInsightDestination.Home.route) {
@@ -129,7 +130,7 @@ fun HeadacheInsightNavHost(
                     },
                 )
             }
-            composable(HeadacheInsightDestination.Home.route) {
+            composable(HeadacheInsightDestination.Home.route) { _: NavBackStackEntry ->
                 HomeRoute(
                     onStartEpisode = { navController.navigate(HeadacheInsightDestination.QuickLog.route) },
                     onAnalyzeAll = { navController.navigate(HeadacheInsightDestination.AllAnalysis.route) },
@@ -143,7 +144,7 @@ fun HeadacheInsightNavHost(
                     onSync = { navController.navigate(HeadacheInsightDestination.Sync.route) },
                 )
             }
-            composable(HeadacheInsightDestination.QuickLog.route) {
+            composable(HeadacheInsightDestination.QuickLog.route) { _: NavBackStackEntry ->
                 QuickLogRoute(
                     onOpenEpisode = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
                     onBack = { navController.popBackStack() },
@@ -153,7 +154,7 @@ fun HeadacheInsightNavHost(
             composable(
                 route = HeadacheInsightDestination.Episode.route,
                 arguments = listOf(navArgument("episodeId") { type = NavType.StringType }),
-            ) {
+            ) { _: NavBackStackEntry ->
                 EpisodeRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
@@ -163,50 +164,50 @@ fun HeadacheInsightNavHost(
             composable(
                 route = HeadacheInsightDestination.Questionnaire.route,
                 arguments = listOf(navArgument("episodeId") { type = NavType.StringType }),
-            ) {
+            ) { _: NavBackStackEntry ->
                 QuestionnaireRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.Profile.route) {
+            composable(HeadacheInsightDestination.Profile.route) { _: NavBackStackEntry ->
                 ProfileRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.Attachments.route) {
+            composable(HeadacheInsightDestination.Attachments.route) { _: NavBackStackEntry ->
                 AttachmentsRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.Insights.route) {
+            composable(HeadacheInsightDestination.Insights.route) { _: NavBackStackEntry ->
                 InsightsRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                     onOpenEpisode = { navController.navigate(HeadacheInsightDestination.Episode.create(it)) },
                 )
             }
-            composable(HeadacheInsightDestination.Reports.route) {
+            composable(HeadacheInsightDestination.Reports.route) { _: NavBackStackEntry ->
                 ReportsRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.AllAnalysis.route) {
+            composable(HeadacheInsightDestination.AllAnalysis.route) { _: NavBackStackEntry ->
                 AllDataAnalysisRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.Settings.route) {
+            composable(HeadacheInsightDestination.Settings.route) { _: NavBackStackEntry ->
                 SettingsRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
                 )
             }
-            composable(HeadacheInsightDestination.Sync.route) {
+            composable(HeadacheInsightDestination.Sync.route) { _: NavBackStackEntry ->
                 SyncRoute(
                     onBack = { navController.popBackStack() },
                     onHome = ::navigateHome,
